@@ -1,3 +1,4 @@
+// com/example/adminappnova/MainActivity.kt
 package com.example.adminappnova
 
 import android.os.Bundle
@@ -11,12 +12,12 @@ import androidx.compose.ui.Modifier
 import androidx.core.splashscreen.SplashScreen.Companion.installSplashScreen
 import com.example.adminappnova.ui.navigation.AppNavigation
 import com.example.adminappnova.ui.theme.AdminAppNovaTheme
+import dagger.hilt.android.AndroidEntryPoint // 👈 --- AÑADE ESTA IMPORTACIÓN
 
-
+@AndroidEntryPoint // 👈 --- AÑADE ESTA ANOTACIÓN
 class MainActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
-        // Instalar el Splash Screen nativo
-        installSplashScreen()
+        // ... (tu código de installSplashScreen, etc.)
 
         super.onCreate(savedInstanceState)
         enableEdgeToEdge()

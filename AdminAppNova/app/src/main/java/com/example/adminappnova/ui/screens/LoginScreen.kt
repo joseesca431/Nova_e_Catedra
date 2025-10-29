@@ -16,11 +16,27 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.navigation.NavController
 import com.example.adminappnova.R
+import com.example.adminappnova.ui.viewmodel.LoginUiState // 👈 Importa tu data class de UiState
 
 @Composable
-fun LoginScreen(navController: NavController){
-    var usuario by remember { mutableStateOf("") }
-    var password by remember {mutableStateOf("")}
+fun LoginScreen(
+    navController: NavController,
+    uiState: LoginUiState, // 👈 Recibe el estado
+    onUsuarioChange: (String) -> Unit, // 👈 Recibe los eventos
+    onPasswordChange: (String) -> Unit,
+    onLoginClick: () -> Unit
+){
+    // Ya no necesitas: var usuario by remember ...
+
+    // Efecto para navegar CUANDO el login es exitoso
+    LaunchedEffect(key1 = uiState.loginSuccess) {
+        if (uiState.loginSuccess) {
+            navController.navigate("start") {
+                launchSingleTop = true
+                popUpTo("login") { inclusive = true } // Limpia el historial de login
+            }
+        }
+    }
 
     Column(
         modifier = Modifier
@@ -59,8 +75,8 @@ fun LoginScreen(navController: NavController){
                 .padding(bottom = 8.dp)
         )
         OutlinedTextField(
-            value = usuario,
-            onValueChange = { usuario = it },
+            value = uiState.usuario, // 👈 Usa el estado del VM
+            onValueChange = onUsuarioChange, // 👈 Llama al evento del VM
             modifier = Modifier
                 .fillMaxWidth()
                 .padding(bottom = 16.dp),
@@ -70,7 +86,8 @@ fun LoginScreen(navController: NavController){
                 focusedContainerColor = Color.White,
                 unfocusedContainerColor = Color.White
             ),
-            shape = RoundedCornerShape(8.dp)
+            shape = RoundedCornerShape(8.dp),
+            singleLine = true
         )
         //Campo de contraseña
         Text(
@@ -82,8 +99,8 @@ fun LoginScreen(navController: NavController){
                 .padding(bottom = 8.dp)
         )
         OutlinedTextField(
-            value = password,
-            onValueChange = { password = it },
+            value = uiState.password, // 👈 Usa el estado del VM
+            onValueChange = onPasswordChange, // 👈 Llama al evento del VM
             visualTransformation = PasswordVisualTransformation(),
             modifier = Modifier
                 .fillMaxWidth()
@@ -94,18 +111,14 @@ fun LoginScreen(navController: NavController){
                 focusedContainerColor = Color.White,
                 unfocusedContainerColor = Color.White
             ),
-            shape = RoundedCornerShape(8.dp)
+            shape = RoundedCornerShape(8.dp),
+            singleLine = true
         )
+
         // Botón INICIAR SESIÓN
         Button(
-            onClick = {
-                // NAVEGAR A LA PANTALLA WELCOME
-                navController.navigate("start") {
-                    launchSingleTop = true
-                    popUpTo("login") { saveState = true }
-                    restoreState = true
-                }
-            },
+            onClick = onLoginClick, // 👈 Llama al evento del VM
+            enabled = !uiState.isLoading, // 👈 Se deshabilita mientras carga
             modifier = Modifier
                 .fillMaxWidth()
                 .height(50.dp),
@@ -114,14 +127,32 @@ fun LoginScreen(navController: NavController){
             ),
             shape = RoundedCornerShape(8.dp)
         ) {
+            if (uiState.isLoading) {
+                // Muestra un indicador de carga
+                CircularProgressIndicator(
+                    modifier = Modifier.size(24.dp),
+                    color = Color.White,
+                    strokeWidth = 3.dp
+                )
+            } else {
+                // Muestra el texto
+                Text(
+                    text = "INICIAR SESIÓN",
+                    color = Color.White,
+                    fontSize = 14.sp,
+                    fontWeight = FontWeight.Bold
+                )
+            }
+        }
+
+        // Muestra un error si existe
+        uiState.error?.let { error ->
+            Spacer(modifier = Modifier.height(16.dp))
             Text(
-                text = "INICIAR SESIÓN",
-                color = Color.White,
-                fontSize = 14.sp,
-                fontWeight = FontWeight.Bold
+                text = error,
+                color = Color.Red,
+                fontSize = 14.sp
             )
         }
-        Spacer(modifier = Modifier.height(16.dp))
-
     }
 }
