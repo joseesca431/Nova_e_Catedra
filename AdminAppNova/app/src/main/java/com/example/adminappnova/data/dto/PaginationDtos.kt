@@ -2,7 +2,10 @@ package com.example.adminappnova.data.dto
 
 import com.google.gson.annotations.SerializedName // <-- Asegúrate de tener esta importación
 
-// --- Estructura principal que coincide con Spring HATEOAS PagedModel ---
+/**
+ * Representa la respuesta paginada completa de Spring HATEOAS (PagedModel).
+ * Es genérico y puede contener cualquier tipo de lista (ej: Productos, Pedidos).
+ */
 data class PagedResponse<T>(
     // Mapea el objeto JSON "_embedded"
     @SerializedName("_embedded")
@@ -52,16 +55,14 @@ data class PagedResponse<T>(
     // Indica si esta es la última página. Calculado a partir del número y total de páginas.
     val last: Boolean
         // Es la última si totalPages es 0 (lista vacía) o si el número actual es el último índice.
-        get() = totalPages == 0 || number >= totalPages - 1
+        get() = totalPages == 0 || number >= (totalPages - 1)
 }
-
-// --- Clases anidadas para representar la estructura HATEOAS ---
 
 /**
  * Representa el objeto JSON `_embedded`.
- * Contiene propiedades nullable para cada posible nombre de lista que tu API
+ * Contiene propiedades nullable para CADA POSIBLE NOMBRE DE LISTA que tu API
  * pueda devolver (ej: "productoResponseList", "pedidoResponseList").
- * Gson/Moshi llenarán la propiedad correspondiente basándose en el JSON recibido.
+ * Gson llenará la propiedad correspondiente basándose en el JSON recibido.
  */
 data class Embedded<T>(
     // Mapea la lista JSON "productoResponseList" a esta propiedad

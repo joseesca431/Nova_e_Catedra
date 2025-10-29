@@ -7,18 +7,15 @@ import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.foundation.shape.RoundedCornerShape
-// --- 👇 AÑADE ESTAS IMPORTACIONES DE ICONOS 👇 ---
+// --- 👇 IMPORTACIONES DE ICONOS CORREGIDAS 👇 ---
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.ArrowDropDown
-import androidx.compose.material.icons.filled.ArrowDropUp
-
+import androidx.compose.material.icons.filled.ArrowDropUp // Esta línea ahora funcionará
 import androidx.compose.material.icons.filled.Check
-
-
-// --- ------------------------------------- ---
+// --- --------------------------------------- ---
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
-import androidx.compose.runtime.derivedStateOf // Importa derivedStateOf
+import androidx.compose.runtime.derivedStateOf
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
@@ -48,6 +45,7 @@ fun PedidosScreen(
 ) {
     var selectedTab by remember { mutableStateOf("Pedidos") }
     val listState = rememberLazyListState()
+    // Define las opciones de filtro, incluyendo "Todos" (null) y todos los valores del Enum
     val filterOptions = listOf<EstadoPedido?>(null) + EstadoPedido.values()
 
     // --- State para el Dropdown ---
@@ -256,14 +254,15 @@ fun PedidoCard(pedido: PedidoResponse, onClick: () -> Unit) {
     }
 }
 
-// --- estadoColor (sin cambios) ---
+// --- estadoColor (sin cambios, pública) ---
 @Composable
 fun estadoColor(estado: EstadoPedido?): Color {
     return when (estado) {
+        EstadoPedido.CARRITO -> Color(0xFF78909C)   // Azul Gris
         EstadoPedido.PENDIENTE -> Color(0xFFFFA726) // Naranja
-        EstadoPedido.CONFIRMADO -> Color(0xFF42A5F5) // Azul
         EstadoPedido.PAGADO -> Color(0xFF66BB6A)     // Verde
-        EstadoPedido.EN_ENVIO -> Color(0xFF29B6F6)   // Celeste
+        EstadoPedido.EN_PROCESO -> Color(0xFFAB47BC) // Morado
+        EstadoPedido.ENVIADO -> Color(0xFF29B6F6)   // Celeste
         EstadoPedido.ENTREGADO -> Color(0xFFBDBDBD)  // Gris
         EstadoPedido.CANCELADO -> Color(0xFFEF5350)  // Rojo
         else -> Color.Gray
@@ -272,5 +271,8 @@ fun estadoColor(estado: EstadoPedido?): Color {
 
 // --- estadoToString (sin cambios) ---
 private fun estadoToString(estado: EstadoPedido?): String {
+    // Si estado es null, devuelve "Todos"
+    // Si no, toma el nombre (ej: "EN_PROCESO"), reemplaza "_" con " ",
+    // lo pone en minúsculas ("en proceso"), y pone la primera letra en mayúscula ("En proceso")
     return estado?.name?.replace("_", " ")?.lowercase()?.replaceFirstChar { if (it.isLowerCase()) it.titlecase() else it.toString() } ?: "Todos"
 }
