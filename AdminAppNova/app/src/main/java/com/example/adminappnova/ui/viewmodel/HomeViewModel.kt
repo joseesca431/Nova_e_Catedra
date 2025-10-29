@@ -14,14 +14,14 @@ import java.math.BigDecimal
 import javax.inject.Inject
 import kotlin.Result // Asegúrate de importar kotlin.Result
 
-// --- Data Class para el Estado de la UI ---
+// --- Data Class para el Estado de la UI (CORREGIDA) ---
 data class HomeUiState(
     val isLoading: Boolean = true,
-    val totalGanancias: BigDecimal? = null, // Ganancias totales
-    val topProductos: Map<String, Long>? = null, // Mapa Nombre -> Cantidad Vendida
-    val pendingOrders: Int = 0,     // Contador pedidos pendientes (AÚN SIMULADO)
-    val completedOrders: Int = 0, // Contador pedidos completados (AÚN SIMULADO)
-    val returns: Int = 0,         // Contador devoluciones (AÚN SIMULADO)
+    // --- Campos Reales (basados en tus endpoints) ---
+    val totalGanancias: BigDecimal? = null, // Para /dashboard/ganancias/totales
+    val topProductos: Map<String, Long>? = null, // Para /dashboard/productos-mas-vendidos
+    // --- Campos Simulados (Eliminados) ---
+    // pendingOrders, completedOrders, returns han sido removidos
     val error: String? = null
 )
 
@@ -48,45 +48,37 @@ class HomeViewModel @Inject constructor(
 
             try {
                 // --- LLAMADAS ASÍNCRONAS CONCURRENTES ---
-                // Lanza las llamadas que no dependen entre sí al mismo tiempo
+                // Lanza las llamadas a los endpoints reales al mismo tiempo
                 val gananciasDeferred = async { pedidoRepository.getGananciasTotales() }
-                val topProductosDeferred = async { pedidoRepository.getProductosMasVendidos(limit = 3) }
-                // TODO: Lanza aquí las llamadas para los contadores cuando existan
-                // val pendingOrdersDeferred = async { pedidoRepository.getPendingOrdersCount() }
-                // val completedOrdersDeferred = async { pedidoRepository.getCompletedOrdersCount() }
-                // val returnsDeferred = async { pedidoRepository.getReturnsCount() }
+                // Llama con limit=5 (basado en tu @RequestParam)
+                val topProductosDeferred = async { pedidoRepository.getProductosMasVendidos(limit = 5) }
+                // ----------------------------------------
 
                 // Espera los resultados de las llamadas
                 val gananciasResult: Result<BigDecimal> = gananciasDeferred.await()
                 val topProductosResult: Result<Map<String, Long>> = topProductosDeferred.await()
-                // val pendingOrdersResult = pendingOrdersDeferred.await()
-                // val completedOrdersResult = completedOrdersDeferred.await()
-                // val returnsResult = returnsDeferred.await()
+                // ----------------------------------------
 
                 // --- MANEJO DE RESULTADOS ---
-                // Lanza excepción si alguna llamada falló (puedes manejar errores individualmente si prefieres)
+                // Lanza excepción si alguna llamada falló
                 val ganancias = gananciasResult.getOrThrow()
                 val topProductos = topProductosResult.getOrThrow()
-                // val pendingCount = pendingOrdersResult.getOrThrow()
-                // val completedCount = completedOrdersResult.getOrThrow()
-                // val returnsCount = returnsResult.getOrThrow()
+                // ------------------------------
 
-                // Simulación TEMPORAL para contadores (Borra esto cuando tengas las llamadas reales)
-                val pendingCount = 5
-                val completedCount = 120
-                val returnsCount = 2
-                // Fin simulación
+                // --- Simulación Eliminada ---
+                // val pendingCount = 5
+                // val completedCount = 120
+                // val returnsCount = 2
+                // --- Fin simulación ---
 
                 Log.d("HomeVM", "Datos cargados: Ganancias=$ganancias, Top=$topProductos")
 
                 // Actualiza el estado con todos los datos cargados
                 uiState = uiState.copy(
                     isLoading = false,
-                    totalGanancias = ganancias,
-                    topProductos = topProductos,
-                    pendingOrders = pendingCount,
-                    completedOrders = completedCount,
-                    returns = returnsCount,
+                    totalGanancias = ganancias, // Establece las ganancias reales
+                    topProductos = topProductos, // Establece los productos reales
+                    // Ya no se actualizan los campos simulados
                     error = null // Limpia error si todo fue exitoso
                 )
 
