@@ -5,4 +5,5 @@ data class PedidoRequest(
     val tipoPago: String, // "TARJETA_CREDITO"
     val cuponCodigo: String? = null,
     val idDireccion: Long
+
 )

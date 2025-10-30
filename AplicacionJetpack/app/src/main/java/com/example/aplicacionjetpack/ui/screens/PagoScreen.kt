@@ -46,18 +46,28 @@ fun PagoScreen(
     val uiState = viewModel.uiState
     val carritoUiState = carritoViewModel.uiState
 
+    // Carga el estado del carrito para mostrar el total
     LaunchedEffect(key1 = Unit) {
         carritoViewModel.loadCarrito()
     }
 
+    // --- 👇👇👇 ¡¡¡LA LÓGICA DE LA VICTORIA ESTÁ AQUÍ!!! 👇👇👇 ---
+    // Este LaunchedEffect maneja la navegación DESPUÉS de un pago exitoso.
     LaunchedEffect(key1 = uiState.checkoutSuccess) {
         if (uiState.checkoutSuccess) {
+            // 1. Le decimos al CarritoViewModel que se actualice desde el backend.
+            //    Como el pago fue exitoso, el backend habrá vaciado el carrito,
+            //    y esta llamada sincronizará la app con esa nueva realidad.
+            carritoViewModel.loadCarrito()
+
+            // 2. Navegamos a la pantalla de éxito.
             navController.navigate("pago_finalizado") {
                 popUpTo("home") { inclusive = false }
                 launchSingleTop = true
             }
         }
     }
+    // --- ------------------------------------------------------------- ---
 
     Scaffold(
         topBar = {
@@ -80,7 +90,7 @@ fun PagoScreen(
                 .padding(24.dp)
         ) {
 
-            // --- 👇👇👇 EL NUEVO SELECTOR DE MÉTODO DE PAGO 👇👇👇 ---
+            // Selector de método de pago
             Text("MÉTODO DE PAGO", style = MaterialTheme.typography.titleMedium, color = OrangeAccent, modifier = Modifier.padding(bottom = 16.dp))
 
             ExposedDropdownMenuBox(
@@ -115,22 +125,22 @@ fun PagoScreen(
                 }
             }
             Spacer(modifier = Modifier.height(24.dp))
-            // --- ----------------------------------------------------- ---
 
-
-            // --- 👇👇👇 CAMPOS DE FORMULARIO DINÁMICOS 👇👇👇 ---
+            // Campos de formulario dinámicos
             when (uiState.metodoPagoSeleccionado) {
                 TipoPago.TARJETA_CREDITO -> TarjetaForm(viewModel = viewModel)
                 TipoPago.PAYPAL -> PaypalForm(viewModel = viewModel)
                 TipoPago.EFECTIVO -> EfectivoInfo()
             }
-            // --- -------------------------------------------- ---
 
+            // Muestra de error
             if (uiState.error != null) {
                 Text(
                     text = uiState.error,
                     color = MaterialTheme.colorScheme.error,
-                    modifier = Modifier.fillMaxWidth().padding(top = 8.dp)
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(top = 8.dp)
                 )
             }
 
@@ -138,6 +148,7 @@ fun PagoScreen(
 
             Divider(color = Color.LightGray, thickness = 1.dp, modifier = Modifier.padding(vertical = 8.dp))
 
+            // Total
             Column(
                 modifier = Modifier.fillMaxWidth(),
                 horizontalAlignment = Alignment.CenterHorizontally
@@ -149,10 +160,13 @@ fun PagoScreen(
 
             Spacer(modifier = Modifier.height(16.dp))
 
+            // Botón PAGAR
             Button(
                 onClick = { viewModel.processFinalCheckout(idCarrito) },
                 enabled = viewModel.isPaymentValid && !uiState.isLoading,
-                modifier = Modifier.fillMaxWidth().height(48.dp),
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .height(48.dp),
                 colors = ButtonDefaults.buttonColors(containerColor = OrangeAccent),
                 shape = RoundedCornerShape(8.dp)
             ) {
@@ -166,7 +180,7 @@ fun PagoScreen(
     }
 }
 
-// --- 👇👇👇 COMPOSABLES AUXILIARES PARA CADA MÉTODO DE PAGO 👇👇👇 ---
+// --- COMPOSABLES AUXILIARES PARA CADA MÉTODO DE PAGO (SIN CAMBIOS) ---
 
 @Composable
 private fun TarjetaForm(viewModel: CheckoutViewModel) {
@@ -233,7 +247,10 @@ private fun PaypalForm(viewModel: CheckoutViewModel) {
 @Composable
 private fun EfectivoInfo() {
     Row(
-        modifier = Modifier.fillMaxWidth().background(Color(0xFFEFEFEF), RoundedCornerShape(8.dp)).padding(16.dp),
+        modifier = Modifier
+            .fillMaxWidth()
+            .background(Color(0xFFEFEFEF), RoundedCornerShape(8.dp))
+            .padding(16.dp),
         verticalAlignment = Alignment.CenterVertically
     ) {
         Icon(Icons.Default.Money, contentDescription = "Efectivo", tint = PurpleDark.copy(alpha = 0.8f))
@@ -246,7 +263,6 @@ private fun EfectivoInfo() {
     }
 }
 
-// Componente genérico para los campos de texto del formulario de pago
 @Composable
 private fun PaymentTextField(
     label: String,
@@ -287,3 +303,4 @@ private fun PaymentTextField(
         )
     }
 }
+

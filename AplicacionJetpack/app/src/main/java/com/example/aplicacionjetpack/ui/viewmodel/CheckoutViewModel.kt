@@ -1,6 +1,7 @@
 package com.example.aplicacionjetpack.ui.viewmodel
 
 import android.util.Log
+import androidx.compose.runtime.derivedStateOf
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.setValue
@@ -49,7 +50,7 @@ data class CheckoutUiState(
 @HiltViewModel
 class CheckoutViewModel @Inject constructor(
     private val pedidoRepository: PedidoRepository,
-    private val direccionRepository: DireccionRepository // Hilt lo inyecta aquí
+    private val direccionRepository: DireccionRepository
 ) : ViewModel() {
 
     var uiState by mutableStateOf(CheckoutUiState())
@@ -57,63 +58,35 @@ class CheckoutViewModel @Inject constructor(
 
     private val TAG = "CheckoutVM"
 
-    // Se llama automáticamente al crear el ViewModel
     init {
         loadDireccionesGuardadas()
     }
 
-    // --- 👇👇👇 ¡¡¡LA LÓGICA QUE FALTABA!!! 👇👇👇 ---
-
-    /**
-     * Carga las direcciones guardadas del usuario autenticado.
-     */
     fun loadDireccionesGuardadas() {
-        val userId = AuthManager.userId
-        if (userId == null) {
-            uiState = uiState.copy(isLoadingDirecciones = false, error = "Error: Usuario no autenticado.")
-            return
-        }
-
+        val userId = AuthManager.userId ?: return
         viewModelScope.launch {
             uiState = uiState.copy(isLoadingDirecciones = true, error = null)
-            Log.d(TAG, "Cargando direcciones guardadas para el usuario ID: $userId")
-
             val result = direccionRepository.getDireccionesByUser(userId)
-
             result.onSuccess { direcciones ->
-                Log.d(TAG, "Direcciones cargadas exitosamente: ${direcciones.size} encontradas.")
-                uiState = uiState.copy(
-                    isLoadingDirecciones = false,
-                    direccionesGuardadas = direcciones
-                )
+                uiState = uiState.copy(isLoadingDirecciones = false, direccionesGuardadas = direcciones)
             }.onFailure { exception ->
+                uiState = uiState.copy(isLoadingDirecciones = false, error = "No se pudieron cargar las direcciones.")
                 Log.e(TAG, "Error al cargar las direcciones guardadas", exception)
-                uiState = uiState.copy(
-                    isLoadingDirecciones = false,
-                    error = "No se pudieron cargar las direcciones."
-                )
             }
         }
     }
 
-    /**
-     * Elimina una dirección y recarga la lista.
-     */
     fun deleteDireccion(idDireccion: Long) {
         viewModelScope.launch {
             val result = direccionRepository.deleteDireccion(idDireccion)
             if (result.isSuccess) {
-                Log.d(TAG, "Dirección $idDireccion borrada, recargando lista.")
-                loadDireccionesGuardadas() // Vuelve a cargar la lista para actualizar la UI
+                loadDireccionesGuardadas()
             } else {
                 uiState = uiState.copy(error = "No se pudo borrar la dirección.")
             }
         }
     }
 
-    /**
-     * Actualiza el estado cuando el usuario selecciona una dirección guardada.
-     */
     fun onDireccionSeleccionada(direccion: DireccionResponse) {
         uiState = uiState.copy(
             departamento = direccion.departamento,
@@ -126,9 +99,6 @@ class CheckoutViewModel @Inject constructor(
         )
     }
 
-    /**
-     * Obtiene la dirección a partir de coordenadas geográficas.
-     */
     fun fetchAddressFromCoordinates(lat: Double, lon: Double) {
         viewModelScope.launch {
             uiState = uiState.copy(isLoadingAddressFromMap = true, usarDireccionExistenteId = null)
@@ -143,21 +113,16 @@ class CheckoutViewModel @Inject constructor(
                     isLoadingAddressFromMap = false
                 )
             } catch (e: Exception) {
-                Log.e(TAG, "Error al obtener dirección desde coordenadas", e)
                 uiState = uiState.copy(isLoadingAddressFromMap = false, error = "No se pudo obtener la dirección.")
+                Log.e(TAG, "Error al obtener dirección desde coordenadas", e)
             }
         }
     }
 
-    // --- -------------------------------------------- ---
+    fun setUsarDireccionExistenteId(id: Long?) {
+        uiState = uiState.copy(usarDireccionExistenteId = id)
+    }
 
-    // --- LÓGICA DE PAGO (¡YA ESTÁ BIEN!) ---
-    // (Aquí va todo el resto del código que ya tenías: onMetodoPagoChange, onNumeroTarjetaChange,
-    // processFinalCheckout, getFinalDireccionId, buildPaymentDetailsJson, etc.
-    // El código que te di en la respuesta anterior para esta parte es correcto y completo.)
-
-    // ... (el resto del ViewModel que ya tienes) ...
-    fun setUsarDireccionExistenteId(id: Long?) { uiState = uiState.copy(usarDireccionExistenteId = id) }
     private suspend fun getAddressFromCoordinates(lat: Double, lon: Double): AddressInfo {
         return withContext(Dispatchers.IO) {
             val urlString = "https://nominatim.openstreetmap.org/reverse?format=json&lat=$lat&lon=$lon"
@@ -165,22 +130,23 @@ class CheckoutViewModel @Inject constructor(
                 val url = URL(urlString)
                 val connection = url.openConnection() as HttpURLConnection
                 connection.setRequestProperty("User-Agent", "NovaECatedraApp/1.0")
-
                 val reader = BufferedReader(InputStreamReader(connection.inputStream))
                 val response = reader.readText()
                 val json = JSONObject(response).getJSONObject("address")
-
-                val calle = json.optString("road", "")
-                val ciudad = json.optString("city", json.optString("town", json.optString("village", "")))
-                val depto = json.optString("state", "")
-                AddressInfo(calle, ciudad, depto)
+                AddressInfo(
+                    calle = json.optString("road", ""),
+                    ciudad = json.optString("city", json.optString("town", json.optString("village", ""))),
+                    depto = json.optString("state", "")
+                )
             } catch (e: Exception) {
                 Log.e(TAG, "Fallo en getAddressFromCoordinates", e)
                 AddressInfo("Error", "No se pudo", "Obtener")
             }
         }
     }
+
     private data class AddressInfo(val calle: String, val ciudad: String, val depto: String)
+
     val isAddressValid: Boolean get() = uiState.departamento.isNotBlank() && uiState.municipio.isNotBlank() && uiState.direccion.isNotBlank()
 
     fun onMetodoPagoChange(nuevoMetodo: TipoPago) { uiState = uiState.copy(metodoPagoSeleccionado = nuevoMetodo, isDropdownExpanded = false, error = null) }
@@ -191,45 +157,110 @@ class CheckoutViewModel @Inject constructor(
     fun onCvvChange(value: String) { val digitsOnly = value.filter { it.isDigit() }; uiState = uiState.copy(cvv = digitsOnly.take(4)) }
     fun onTitularChange(value: String) { uiState = uiState.copy(titular = value) }
     fun onEmailPaypalChange(value: String) { uiState = uiState.copy(emailPaypal = value) }
-    val isPaymentValid: Boolean get() = when (uiState.metodoPagoSeleccionado) {
-        TipoPago.TARJETA_CREDITO -> ValidationUtils.isValidCardNumber(uiState.numeroTarjeta) && ValidationUtils.isValidExpiryDate(uiState.fechaVencimiento) && ValidationUtils.isValidCvv(uiState.cvv) && ValidationUtils.isValidCardHolder(uiState.titular)
-        TipoPago.PAYPAL -> ValidationUtils.isValidEmail(uiState.emailPaypal)
-        TipoPago.EFECTIVO -> true
-    }
-    fun processFinalCheckout(idCarrito: Long) {
-        if (!isAddressValid) { uiState = uiState.copy(error = "La dirección de entrega no es válida."); return }
-        if (!isPaymentValid) { uiState = uiState.copy(error = "Los datos del método de pago son inválidos."); return }
-        viewModelScope.launch {
-            val userId = AuthManager.userId ?: run { handleError("Error fatal: Usuario no autenticado."); return@launch }
-            uiState = uiState.copy(isLoading = true, error = null)
-            val idDireccionResult = getFinalDireccionId(userId)
-            if (idDireccionResult.isFailure) { handleError("No se pudo procesar la dirección."); return@launch }
-            val idDireccionFinal = idDireccionResult.getOrThrow()
-            val pedidoRequest = PedidoRequest(idCarrito = idCarrito, tipoPago = uiState.metodoPagoSeleccionado.name, cuponCodigo = null, idDireccion = idDireccionFinal)
-            val detallesJson = buildPaymentDetailsJson()
-            val pagoRequest = PagoRequest(detallesPago = detallesJson)
-            val finalResult = pedidoRepository.createAndPayOrder(pedidoRequest, pagoRequest)
-            finalResult.onSuccess { uiState = uiState.copy(isLoading = false, checkoutSuccess = true) }.onFailure { Log.e(TAG, "Error en el checkout final.", it); handleError("El pago falló: ${it.message}") }
+
+    val isPaymentValid: Boolean by derivedStateOf {
+        when (uiState.metodoPagoSeleccionado) {
+            TipoPago.TARJETA_CREDITO -> {
+                ValidationUtils.isValidCardNumber(uiState.numeroTarjeta) &&
+                        ValidationUtils.isValidExpiryDate(uiState.fechaVencimiento) &&
+                        ValidationUtils.isValidCvv(uiState.cvv) &&
+                        ValidationUtils.isValidCardHolder(uiState.titular)
+            }
+            TipoPago.PAYPAL -> ValidationUtils.isValidEmail(uiState.emailPaypal)
+            TipoPago.EFECTIVO -> true
         }
     }
+
+    fun processFinalCheckout(idCarrito: Long) {
+        if (!isAddressValid) {
+            uiState = uiState.copy(error = "La dirección de entrega no es válida.")
+            return
+        }
+        if (!isPaymentValid) {
+            uiState = uiState.copy(error = "Los datos del método de pago son inválidos.")
+            return
+        }
+
+        viewModelScope.launch {
+            uiState = uiState.copy(isLoading = true, error = null)
+            val userId = AuthManager.userId ?: run {
+                handleError("Error fatal: Usuario no autenticado.")
+                return@launch
+            }
+            val idDireccionFinal = getFinalDireccionId(userId).getOrElse {
+                handleError("No se pudo procesar la dirección: ${it.message}")
+                return@launch
+            }
+            val pedidoRequest = PedidoRequest(
+                idCarrito = idCarrito,
+                tipoPago = uiState.metodoPagoSeleccionado.name,
+                cuponCodigo = null,
+                idDireccion = idDireccionFinal
+            )
+            Log.d(TAG, "Iniciando checkout de 2 pasos. Paso 1: Creando pedido...")
+            val checkoutResult = pedidoRepository.checkout(pedidoRequest)
+            checkoutResult.onSuccess { pedidoCreado ->
+                Log.d(TAG, "Paso 1 exitoso. Pedido Creado ID: ${pedidoCreado.idPedido}. Iniciando Paso 2: Pagar...")
+
+                // --- 👇👇👇 ¡¡¡LA LÍNEA QUE ARREGLA EL ERROR 400!!! 👇👇👇 ---
+                // Creamos el 'pagoRequest' con la estructura que el backend espera,
+                // incluyendo el objeto 'usuario' que contiene el 'idUser'.
+                val pagoRequest = PagoRequest(
+                    detallesPago = buildPaymentDetailsJson(),
+                    usuario = UserRequest(idUser = userId) // Añadimos el usuario
+                )
+                // --- ----------------------------------------------------- ---
+
+                val pagarResult = pedidoRepository.pagar(pedidoCreado.idPedido, pagoRequest)
+                pagarResult.onSuccess {
+                    Log.d(TAG, "Paso 2 exitoso. El pago se completó.")
+                    uiState = uiState.copy(isLoading = false, checkoutSuccess = true)
+                }.onFailure { e ->
+                    Log.e(TAG, "Paso 2 (Pagar) falló después de un checkout exitoso.", e)
+                    handleError("El pago no pudo ser procesado: ${e.message}")
+                }
+            }.onFailure { e ->
+                Log.e(TAG, "Paso 1 (Checkout) falló.", e)
+                handleError("No se pudo iniciar el pedido: ${e.message}")
+            }
+        }
+    }
+
+
     private fun buildPaymentDetailsJson(): String {
         val json = JSONObject()
         when (uiState.metodoPagoSeleccionado) {
-            TipoPago.TARJETA_CREDITO -> { json.put("numeroTarjeta", uiState.numeroTarjeta); json.put("fechaVencimiento", uiState.fechaVencimiento); json.put("cvv", uiState.cvv); json.put("titular", uiState.titular) }
+            TipoPago.TARJETA_CREDITO -> {
+                json.put("numeroTarjeta", uiState.numeroTarjeta)
+                json.put("fechaVencimiento", uiState.fechaVencimiento)
+                json.put("cvv", uiState.cvv)
+                json.put("titular", uiState.titular)
+            }
             TipoPago.PAYPAL -> { json.put("email", uiState.emailPaypal) }
             TipoPago.EFECTIVO -> { json.put("mensaje", "Pago se realizará contra entrega.") }
         }
         return json.toString()
     }
+
     private suspend fun getFinalDireccionId(userId: Long): Result<Long> {
         return withContext(Dispatchers.IO) {
             if (uiState.usarDireccionExistenteId != null) {
                 return@withContext Result.success(uiState.usarDireccionExistenteId!!)
             }
-            val request = DireccionRequest(alias = uiState.aliasDireccion, calle = uiState.direccion, ciudad = uiState.municipio, departamento = uiState.departamento, latitud = uiState.latitud, longitud = uiState.longitud)
+            val request = DireccionRequest(
+                alias = uiState.aliasDireccion,
+                calle = uiState.direccion,
+                ciudad = uiState.municipio,
+                departamento = uiState.departamento,
+                latitud = uiState.latitud,
+                longitud = uiState.longitud
+            )
             val result = direccionRepository.createDireccion(userId, request)
             result.map { it.idDireccion }
         }
     }
-    private fun handleError(message: String) { uiState = uiState.copy(isLoading = false, error = message) }
+
+    private fun handleError(message: String) {
+        uiState = uiState.copy(isLoading = false, error = message)
+    }
 }

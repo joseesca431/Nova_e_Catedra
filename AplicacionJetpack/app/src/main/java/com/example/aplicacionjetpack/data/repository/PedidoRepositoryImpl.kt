@@ -30,9 +30,12 @@ class PedidoRepositoryImpl @Inject constructor(
 
     override suspend fun checkout(request: PedidoRequest): Result<PedidoResponse> {
         return try {
-            Result.success(api.checkout(request))
+            Log.d(TAG, "Llamando a /auth/pedido/checkout con: $request")
+            val response = api.checkout(request)
+            Log.d(TAG, "Checkout exitoso. Pedido creado/actualizado: ${response.idPedido}")
+            Result.success(response)
         } catch (e: Exception) {
-            Log.e(TAG, "checkout falló", e)
+            Log.e(TAG, "Fallo en el checkout", e)
             Result.failure(e)
         }
     }
