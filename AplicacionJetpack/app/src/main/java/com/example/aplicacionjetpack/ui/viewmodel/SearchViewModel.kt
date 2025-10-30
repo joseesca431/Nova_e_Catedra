@@ -1,7 +1,5 @@
 package com.example.aplicacionjetpack.ui.viewmodel
 
-import android.util.Log
-import androidx.compose.runtime.derivedStateOf
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.setValue
@@ -10,29 +8,19 @@ import androidx.lifecycle.viewModelScope
 import com.example.aplicacionjetpack.data.dto.ProductResponse
 import com.example.aplicacionjetpack.data.repository.ProductRepository
 import dagger.hilt.android.lifecycle.HiltViewModel
+import kotlinx.coroutines.Job
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 import javax.inject.Inject
 
+// Estado de la UI para la pantalla de búsqueda
 data class SearchUiState(
     val searchQuery: String = "",
-    val isLoading: Boolean = true,
-    private val _allProducts: List<ProductResponse> = emptyList(), // Lista completa
+    val searchResults: List<ProductResponse> = emptyList(),
+    val allProducts: List<ProductResponse> = emptyList(), // Lista completa para filtrar
+    val isLoading: Boolean = false,
     val error: String? = null
-) {
-    // Lista filtrada que la UI observará
-    val searchResults: List<ProductResponse> by derivedStateOf {
-        if (searchQuery.isBlank()) {
-            emptyList() // No mostrar nada si la búsqueda está vacía
-        } else {
-            // Filtra por nombre, descripción o tipo
-            _allProducts.filter {
-                it.nombre.contains(searchQuery, ignoreCase = true) ||
-                        it.descripcion?.contains(searchQuery, ignoreCase = true) == true ||
-                        it.nombreTipo?.contains(searchQuery, ignoreCase = true) == true
-            }
-        }
-    }
-}
+)
 
 @HiltViewModel
 class SearchViewModel @Inject constructor(
@@ -42,36 +30,56 @@ class SearchViewModel @Inject constructor(
     var uiState by mutableStateOf(SearchUiState())
         private set
 
-    private val TAG = "SearchVM"
+    private var searchJob: Job? = null
 
     init {
-        // Carga una página grande de productos para la búsqueda en cliente
-        loadAllProductsForSearch()
+        // Carga todos los productos en segundo plano al iniciar
+        loadAllProducts()
     }
 
-    private fun loadAllProductsForSearch() {
+    // Carga la lista completa de productos para poder filtrar localmente
+    private fun loadAllProducts() {
         viewModelScope.launch {
             uiState = uiState.copy(isLoading = true, error = null)
-            Log.d(TAG, "Cargando TODOS los productos para búsqueda...")
-
-            // Pide una página grande. Para una app real, el backend debería hacer la búsqueda.
-            val result = productRepository.getAllProducts(page = 0, size = 200)
-
+            // NOTA: Esto no es ideal para miles de productos.
+            // La solución correcta sería un endpoint de búsqueda en el backend.
+            // Por ahora, para que funcione, cargamos todo.
+            val result = productRepository.getAllProducts(page = 0, size = 100) // Carga hasta 100 productos
             result.onSuccess { pagedResponse ->
-                Log.d(TAG, "Total productos para búsqueda: ${pagedResponse.content.size}")
                 uiState = uiState.copy(
                     isLoading = false,
-                    _allProducts = pagedResponse.content // Guarda la lista completa
+                    allProducts = pagedResponse.content
                 )
-            }.onFailure { e ->
-                Log.e(TAG, "Error cargando todos los productos", e)
-                uiState = uiState.copy(isLoading = false, error = "No se pudieron cargar productos.")
+            }.onFailure {
+                uiState = uiState.copy(
+                    isLoading = false,
+                    error = "No se pudo cargar la lista de productos para buscar."
+                )
             }
         }
     }
 
-    // Evento llamado por el TextField
-    fun onSearchQueryChange(query: String) {
+    // --- 👇👇👇 ¡¡¡LA FUNCIÓN QUE FALTABA!!! 👇👇👇 ---
+    // Se llama cada vez que el texto de búsqueda cambia
+    fun onSearchQueryChanged(query: String) {
         uiState = uiState.copy(searchQuery = query)
+
+        // Cancela la búsqueda anterior para no sobrecargar
+        searchJob?.cancel()
+
+        // Inicia una nueva búsqueda después de un breve retraso (debounce)
+        searchJob = viewModelScope.launch {
+            delay(300L) // Espera 300ms antes de buscar
+
+            if (query.isBlank()) {
+                uiState = uiState.copy(searchResults = emptyList())
+            } else {
+                // Filtra la lista completa de productos localmente
+                val results = uiState.allProducts.filter {
+                    it.nombre.contains(query, ignoreCase = true)
+                }
+                uiState = uiState.copy(searchResults = results)
+            }
+        }
     }
 }

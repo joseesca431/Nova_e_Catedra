@@ -13,8 +13,6 @@ import androidx.navigation.navArgument
 import com.example.aplicacionjetpack.ui.screens.*
 import com.example.aplicacionjetpack.ui.viewmodel.*
 
-// NO MÁS HELPERS COMPLICADOS NI GRAFOS ANIDADOS
-
 @Composable
 fun AppNavigation() {
     val navController = rememberNavController()
@@ -71,10 +69,25 @@ fun AppNavigation() {
                     navController.navigate("product_detail/${product.idProducto}")
                 },
                 onSearchClick = {
-                    // navController.navigate("busqueda")
+                    navController.navigate("busqueda")
                 }
             )
         }
+
+        // --- 👇👇👇 ¡LA RUTA DE BÚSQUEDA CORREGIDA! 👇👇👇 ---
+        composable("busqueda") {
+            val viewModel: SearchViewModel = hiltViewModel() // Crea el nuevo ViewModel
+            BusquedaScreen(
+                navController = navController,
+                uiState = viewModel.uiState,
+                // Llama a la función que SÍ existe en SearchViewModel
+                onQueryChange = viewModel::onSearchQueryChanged,
+                onProductClick = { product ->
+                    navController.navigate("product_detail/${product.idProducto}")
+                }
+            )
+        }
+        // --- -------------------------------------------- ---
 
         composable(
             route = "product_detail/{productId}",
@@ -90,20 +103,14 @@ fun AppNavigation() {
         composable("cart") {
             CarritoScreen(
                 navController = navController,
-                // Le pasamos la lógica de navegación directamente aquí
                 onPagarClick = { idCarrito ->
-                    // --- LA ÚNICA LÓGICA QUE IMPORTA ---
-                    // Solo navegamos si el ID es válido.
                     if (idCarrito > 0) {
-                        // Navegamos directamente a la primera pantalla del flujo.
                         navController.navigate("confirm_address/$idCarrito")
                     }
-                    // Si idCarrito es 0 o nulo, NO HACE NADA. No hay crash.
                 }
             )
         }
 
-        // --- EL CHECKOUT SIMPLIFICADO, DIRECTO Y FUNCIONAL ---
         composable(
             route = "confirm_address/{idCarrito}",
             arguments = listOf(navArgument("idCarrito") { type = NavType.LongType })
@@ -112,7 +119,7 @@ fun AppNavigation() {
             ConfirmAddressScreen(
                 navController = navController,
                 idCarrito = idCarrito,
-                viewModel = hiltViewModel() // Hilt crea la primera instancia aquí.
+                viewModel = hiltViewModel()
             )
         }
 
@@ -121,19 +128,15 @@ fun AppNavigation() {
             arguments = listOf(navArgument("idCarrito") { type = NavType.LongType })
         ) { backStackEntry ->
             val idCarrito = backStackEntry.arguments?.getLong("idCarrito") ?: 0L
-
-            // Hilt es inteligente: busca la instancia de ViewModel creada en la pantalla anterior.
             val checkoutViewModel: CheckoutViewModel = hiltViewModel(
                 remember(backStackEntry) {
                     navController.getBackStackEntry("confirm_address/{idCarrito}")
                 }
             )
-
             DetallesPagoScreen(
                 navController = navController,
                 idCarrito = idCarrito,
                 checkoutViewModel = checkoutViewModel
-                // El CarritoViewModel se crea dentro con hiltViewModel() por defecto.
             )
         }
 
@@ -142,22 +145,17 @@ fun AppNavigation() {
             arguments = listOf(navArgument("idCarrito") { type = NavType.LongType })
         ) { backStackEntry ->
             val idCarrito = backStackEntry.arguments?.getLong("idCarrito") ?: 0L
-
-            // Reutilizamos el mismo ViewModel del flujo.
             val checkoutViewModel: CheckoutViewModel = hiltViewModel(
                 remember(backStackEntry) {
                     navController.getBackStackEntry("confirm_address/{idCarrito}")
                 }
             )
-
             PagoScreen(
                 navController = navController,
                 idCarrito = idCarrito,
                 viewModel = checkoutViewModel
-                // El CarritoViewModel se crea dentro con hiltViewModel() por defecto.
             )
         }
-        // --- -------------------------------------------- ---
 
         composable("pago_finalizado") {
             PagoFinalizadoScreen(navController = navController)
