@@ -17,57 +17,51 @@ import androidx.compose.ui.unit.sp
 import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.navigation.NavController
 import com.example.aplicacionjetpack.R
+import com.example.aplicacionjetpack.ui.viewmodel.CarritoViewModel
 import com.example.aplicacionjetpack.ui.viewmodel.CheckoutViewModel
+import java.text.NumberFormat
+import java.util.Locale
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun PagoScreen(
     navController: NavController,
-    // --- PARÁMETROS AÑADIDOS ---
     idCarrito: Long,
-    viewModel: CheckoutViewModel
+    viewModel: CheckoutViewModel,
+    // Inyectamos el CarritoViewModel para poder mostrar el total
+    carritoViewModel: CarritoViewModel = hiltViewModel()
 ) {
-    // Conecta el estado de la UI al ViewModel
     val uiState = viewModel.uiState
+    val carritoUiState = carritoViewModel.uiState
 
-    // 1. Cuando la pantalla se carga, crea el pedido en estado PENDIENTE
+    // --- 👇👇👇 ¡LÓGICA SIMPLIFICADA Y CORRECTA! 👇👇👇 ---
+    // Ya no se crea ningún pedido aquí.
+    // Solo cargamos los datos del carrito para mostrar el total.
     LaunchedEffect(key1 = Unit) {
-        viewModel.createPendingOrder(idCarrito)
+        carritoViewModel.loadCarrito()
     }
 
-    // 2. Observa si el pago fue exitoso para navegar
+    // Observa si el pago fue exitoso para navegar
     LaunchedEffect(key1 = uiState.checkoutSuccess) {
         if (uiState.checkoutSuccess) {
             navController.navigate("pago_finalizado") {
-                popUpTo("home") { inclusive = false } // Vuelve a Home
+                popUpTo("home") { inclusive = false }
                 launchSingleTop = true
             }
         }
     }
+    // --- -------------------------------------------- ---
 
     Scaffold(
         topBar = {
             TopAppBar(
-                title = {
-                    Text(
-                        text = "Pago",
-                        fontSize = 18.sp,
-                        color = Color(0xFF2D1B4E),
-                        fontWeight = FontWeight.Medium
-                    )
-                },
+                title = { Text("Pago", fontSize = 18.sp, color = Color(0xFF2D1B4E), fontWeight = FontWeight.Medium) },
                 navigationIcon = {
                     IconButton(onClick = { navController.navigateUp() }) {
-                        Icon(
-                            painter = painterResource(id = R.drawable.ic_atras),
-                            contentDescription = "Atrás",
-                            tint = Color(0xFF2D1B4E)
-                        )
+                        Icon(painter = painterResource(id = R.drawable.ic_atras), contentDescription = "Atrás", tint = Color(0xFF2D1B4E))
                     }
                 },
-                colors = TopAppBarDefaults.topAppBarColors(
-                    containerColor = Color.White
-                )
+                colors = TopAppBarDefaults.topAppBarColors(containerColor = Color.White)
             )
         }
     ) { paddingValues ->
@@ -79,214 +73,131 @@ fun PagoScreen(
                 .padding(24.dp),
             verticalArrangement = Arrangement.spacedBy(16.dp)
         ) {
-            // Sección Número de tarjeta
-            Column(modifier = Modifier.fillMaxWidth()) {
-                Text(
-                    text = "Número de tarjeta",
-                    fontSize = 14.sp,
-                    color = Color.Black,
-                    fontWeight = FontWeight.Medium,
-                    modifier = Modifier.padding(bottom = 8.dp)
-                )
-                OutlinedTextField(
-                    value = uiState.numeroTarjeta, // <- Conectado
-                    onValueChange = { viewModel.onNumeroTarjetaChange(it) }, // <- Conectado
-                    modifier = Modifier.fillMaxWidth(),
-                    placeholder = {
-                        Text(
-                            text = "1234 5678 9012 3456",
-                            fontSize = 14.sp,
-                            color = Color.Gray
-                        )
-                    },
-                    colors = OutlinedTextFieldDefaults.colors(
-                        focusedBorderColor = Color(0xFF2D1B4E),
-                        unfocusedBorderColor = Color.LightGray,
-                        focusedContainerColor = Color.White,
-                        unfocusedContainerColor = Color.White
-                    ),
-                    shape = RoundedCornerShape(8.dp),
-                    keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
-                    isError = uiState.error != null
-                )
-            }
+            // --- CAMPOS DE TEXTO (Sin cambios en su estructura) ---
+            // Número de tarjeta
+            FormTextField(
+                label = "Número de tarjeta",
+                value = uiState.numeroTarjeta,
+                onValueChange = viewModel::onNumeroTarjetaChange,
+                placeholder = "1234 5678 9012 3456",
+                keyboardType = KeyboardType.Number,
+                isError = uiState.error != null
+            )
 
-            // Fila para Fecha de vencimiento y CVV
-            Row(
-                modifier = Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.spacedBy(16.dp)
-            ) {
-                // Fecha de vencimiento
-                Column(
-                    modifier = Modifier.weight(1f)
-                ) {
-                    Text(
-                        text = "Fecha de vencimiento",
-                        fontSize = 14.sp,
-                        color = Color.Black,
-                        fontWeight = FontWeight.Medium,
-                        modifier = Modifier.padding(bottom = 8.dp)
-                    )
-                    OutlinedTextField(
-                        value = uiState.fechaVencimiento, // <- Conectado
-                        onValueChange = { viewModel.onFechaVencimientoChange(it) }, // <- Conectado
-                        modifier = Modifier.fillMaxWidth(),
-                        placeholder = {
-                            Text(
-                                text = "MM/AA",
-                                fontSize = 14.sp,
-                                color = Color.Gray
-                            )
-                        },
-                        colors = OutlinedTextFieldDefaults.colors(
-                            focusedBorderColor = Color(0xFF2D1B4E),
-                            unfocusedBorderColor = Color.LightGray,
-                            focusedContainerColor = Color.White,
-                            unfocusedContainerColor = Color.White
-                        ),
-                        shape = RoundedCornerShape(8.dp),
+            // Fecha de vencimiento y CVV
+            Row(horizontalArrangement = Arrangement.spacedBy(16.dp)) {
+                Box(modifier = Modifier.weight(1f)) {
+                    FormTextField(
+                        label = "Fecha de vencimiento",
+                        value = uiState.fechaVencimiento,
+                        onValueChange = viewModel::onFechaVencimientoChange,
+                        placeholder = "MM/AA",
                         isError = uiState.error != null
                     )
                 }
-
-                // CVV
-                Column(
-                    modifier = Modifier.weight(1f)
-                ) {
-                    Text(
-                        text = "CVV",
-                        fontSize = 14.sp,
-                        color = Color.Black,
-                        fontWeight = FontWeight.Medium,
-                        modifier = Modifier.padding(bottom = 8.dp)
-                    )
-                    OutlinedTextField(
-                        value = uiState.cvv, // <- Conectado
-                        onValueChange = { viewModel.onCvvChange(it) }, // <- Conectado
-                        modifier = Modifier.fillMaxWidth(),
-                        placeholder = {
-                            Text(
-                                text = "123",
-                                fontSize = 14.sp,
-                                color = Color.Gray
-                            )
-                        },
-                        colors = OutlinedTextFieldDefaults.colors(
-                            focusedBorderColor = Color(0xFF2D1B4E),
-                            unfocusedBorderColor = Color.LightGray,
-                            focusedContainerColor = Color.White,
-                            unfocusedContainerColor = Color.White
-                        ),
-                        shape = RoundedCornerShape(8.dp),
-                        keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
+                Box(modifier = Modifier.weight(1f)) {
+                    FormTextField(
+                        label = "CVV",
+                        value = uiState.cvv,
+                        onValueChange = viewModel::onCvvChange,
+                        placeholder = "123",
+                        keyboardType = KeyboardType.Number,
                         isError = uiState.error != null
                     )
                 }
             }
 
             // Titular de la tarjeta
-            Column(modifier = Modifier.fillMaxWidth()) {
-                Text(
-                    text = "Titular de la tarjeta",
-                    fontSize = 14.sp,
-                    color = Color.Black,
-                    fontWeight = FontWeight.Medium,
-                    modifier = Modifier.padding(bottom = 8.dp)
-                )
-                OutlinedTextField(
-                    value = uiState.titular, // <- Conectado
-                    onValueChange = { viewModel.onTitularChange(it) }, // <- Conectado
-                    modifier = Modifier.fillMaxWidth(),
-                    placeholder = {
-                        Text(
-                            text = "Nombre como aparece en la tarjeta",
-                            fontSize = 14.sp,
-                            color = Color.Gray
-                        )
-                    },
-                    colors = OutlinedTextFieldDefaults.colors(
-                        focusedBorderColor = Color(0xFF2D1B4E),
-                        unfocusedBorderColor = Color.LightGray,
-                        focusedContainerColor = Color.White,
-                        unfocusedContainerColor = Color.White
-                    ),
-                    shape = RoundedCornerShape(8.dp),
-                    isError = uiState.error != null
-                )
-            }
+            FormTextField(
+                label = "Titular de la tarjeta",
+                value = uiState.titular,
+                onValueChange = viewModel::onTitularChange,
+                placeholder = "Nombre como aparece en la tarjeta",
+                isError = uiState.error != null
+            )
+            // --- ------------------------------------------------ ---
 
-            // Muestra el error
             if (uiState.error != null) {
                 Text(
                     text = uiState.error,
                     color = MaterialTheme.colorScheme.error,
-                    modifier = Modifier.fillMaxWidth()
+                    modifier = Modifier.fillMaxWidth().padding(top = 8.dp)
                 )
             }
 
-            Spacer(modifier = Modifier.height(8.dp))
+            Spacer(modifier = Modifier.weight(1f)) // Empuja el resto hacia abajo
 
-            // Línea divisoria
-            Divider(
-                color = Color.LightGray,
-                thickness = 1.dp,
-                modifier = Modifier.padding(vertical = 8.dp)
-            )
+            Divider(color = Color.LightGray, thickness = 1.dp, modifier = Modifier.padding(vertical = 8.dp))
 
-            // Total a pagar
+            // --- 👇👇👇 ¡TOTAL REAL! 👇👇👇 ---
             Column(
                 modifier = Modifier.fillMaxWidth(),
                 horizontalAlignment = Alignment.CenterHorizontally
             ) {
-                Text(
-                    text = "TOTAL A PAGAR:",
-                    fontSize = 16.sp,
-                    color = Color.Gray,
-                    fontWeight = FontWeight.Medium,
-                    modifier = Modifier.padding(bottom = 4.dp)
-                )
-                Text(
-                    text = "$0.00", // TODO: Obtener total real del CarritoViewModel
-                    fontSize = 24.sp,
-                    color = Color(0xFF2D1B4E),
-                    fontWeight = FontWeight.Bold
-                )
+                Text("TOTAL A PAGAR:", fontSize = 16.sp, color = Color.Gray, fontWeight = FontWeight.Medium, modifier = Modifier.padding(bottom = 4.dp))
+                val totalFormatted = NumberFormat.getCurrencyInstance(Locale.US).format(carritoUiState.total)
+                Text(totalFormatted, fontSize = 24.sp, color = Color(0xFF2D1B4E), fontWeight = FontWeight.Bold)
             }
+            // --- --------------------------- ---
 
             Spacer(modifier = Modifier.height(16.dp))
 
-            // Botón PAGAR
+            // --- 👇👇👇 ¡¡¡EL BOTÓN DE LA VICTORIA!!! 👇👇👇 ---
             Button(
                 onClick = {
-                    // 3. Llama al paso final de pago
-                    viewModel.processPayment()
+                    // Llama a la nueva función que lo hace todo
+                    viewModel.processFinalCheckout(idCarrito)
                 },
-                enabled = viewModel.isPaymentValid &&
-                        uiState.idPedidoPendiente != null &&
-                        !uiState.isLoading,
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .height(48.dp),
-                colors = ButtonDefaults.buttonColors(
-                    containerColor = Color(0xFFFF801F)
-                ),
+                // Se habilita si los datos del formulario son válidos
+                enabled = viewModel.isPaymentValid && !uiState.isLoading,
+                modifier = Modifier.fillMaxWidth().height(48.dp),
+                colors = ButtonDefaults.buttonColors(containerColor = Color(0xFFFF801F)),
                 shape = RoundedCornerShape(8.dp)
             ) {
                 if (uiState.isLoading) {
-                    CircularProgressIndicator(
-                        modifier = Modifier.size(24.dp),
-                        color = Color.White,
-                        strokeWidth = 3.dp
-                    )
+                    CircularProgressIndicator(modifier = Modifier.size(24.dp), color = Color.White, strokeWidth = 3.dp)
                 } else {
-                    Text(
-                        text = "PAGAR",
-                        color = Color.White,
-                        fontSize = 16.sp,
-                        fontWeight = FontWeight.Bold
-                    )
+                    Text("PAGAR", color = Color.White, fontSize = 16.sp, fontWeight = FontWeight.Bold)
                 }
             }
+            // --- ------------------------------------------ ---
         }
+    }
+}
+
+// Componente auxiliar para no repetir código en los TextFields
+@Composable
+private fun FormTextField(
+    label: String,
+    value: String,
+    onValueChange: (String) -> Unit,
+    placeholder: String,
+    keyboardType: KeyboardType = KeyboardType.Text,
+    isError: Boolean
+) {
+    Column(modifier = Modifier.fillMaxWidth()) {
+        Text(
+            text = label,
+            fontSize = 14.sp,
+            color = Color.Black,
+            fontWeight = FontWeight.Medium,
+            modifier = Modifier.padding(bottom = 8.dp)
+        )
+        OutlinedTextField(
+            value = value,
+            onValueChange = onValueChange,
+            modifier = Modifier.fillMaxWidth(),
+            placeholder = { Text(text = placeholder, fontSize = 14.sp, color = Color.Gray) },
+            colors = OutlinedTextFieldDefaults.colors(
+                focusedBorderColor = Color(0xFF2D1B4E),
+                unfocusedBorderColor = Color.LightGray,
+                focusedContainerColor = Color.White,
+                unfocusedContainerColor = Color.White
+            ),
+            shape = RoundedCornerShape(8.dp),
+            keyboardOptions = KeyboardOptions(keyboardType = keyboardType),
+            isError = isError,
+            singleLine = true
+        )
     }
 }

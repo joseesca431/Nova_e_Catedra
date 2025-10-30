@@ -1,8 +1,6 @@
-// src/main/java/com/example/aplicacionjetpack/ui/screens/ConfirmAddressScreen.kt
 package com.example.aplicacionjetpack.ui.screens
 
 import android.annotation.SuppressLint
-import android.net.Uri
 import android.view.ViewGroup
 import android.webkit.WebResourceRequest
 import android.webkit.WebView
@@ -13,7 +11,10 @@ import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.Delete
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.runtime.getValue
@@ -34,7 +35,7 @@ import com.example.aplicacionjetpack.ui.theme.OrangeAccent
 import com.example.aplicacionjetpack.ui.theme.PurpleDark
 import com.example.aplicacionjetpack.ui.viewmodel.CheckoutViewModel
 
-// --- 👇👇👇 ¡¡¡EL JAVASCRIPT HA SIDO MEJORADO!!! 👇👇👇 ---
+// --- EL CÓDIGO HTML DEL MAPA (SIN CAMBIOS) ---
 private val mapHtml = """
 <!DOCTYPE html>
 <html>
@@ -63,10 +64,7 @@ private val mapHtml = """
                 map.removeLayer(marker);
             }
             marker = L.marker([lat, lng]).addTo(map);
-            
-            // --- ¡LA MAGIA AHORA ES ESTA! ---
-            // En lugar de llamar a una interfaz, cambiamos la URL.
-            window.location.href = `app://address?lat=${"$"}{lat}&lon=${"$"}{lng}`;
+            window.location.href = `app://address?lat=${'$'}{lat}&lon=${'$'}{lng}`;
         });
     </script>
 </body>
@@ -110,44 +108,43 @@ fun ConfirmAddressScreen(
                     .fillMaxWidth()
                     .weight(1f)
             ) {
+                // --- 👇👇👇 ¡¡¡EL CÓDIGO COMPLETO Y RESTAURADO DEL MAPA!!! 👇👇👇 ---
                 AndroidView(
                     factory = { ctx ->
                         WebView(ctx).apply {
                             layoutParams = ViewGroup.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.MATCH_PARENT)
                             settings.javaScriptEnabled = true
 
-                            // --- 👇👇👇 ¡¡¡LA SOLUCIÓN DEFINITIVA!!! 👇👇👇 ---
+                            // Lógica para interceptar el clic del mapa
                             webViewClient = object : WebViewClient() {
                                 override fun shouldOverrideUrlLoading(view: WebView?, request: WebResourceRequest?): Boolean {
                                     val url = request?.url ?: return false
-                                    // Si la URL que se intenta cargar empieza con nuestro esquema personalizado...
                                     if (url.scheme == "app" && url.host == "address") {
-                                        // Extraemos los parámetros lat y lon
                                         val lat = url.getQueryParameter("lat")?.toDoubleOrNull()
                                         val lon = url.getQueryParameter("lon")?.toDoubleOrNull()
 
                                         if (lat != null && lon != null) {
                                             mapTouched = true
+                                            // Limpiamos la selección de cualquier tarjeta de dirección existente
+                                            selectedDireccionId = null
+                                            // Llamamos al ViewModel para que busque la nueva dirección
                                             viewModel.fetchAddressFromCoordinates(lat, lon)
                                         }
-                                        // Devolvemos 'true' para decirle al WebView:
-                                        // "No navegues a esta URL, ya la hemos manejado nosotros".
-                                        return true
+                                        return true // Evita la navegación
                                     }
-                                    // Para cualquier otra URL, deja que el WebView la maneje normalmente.
                                     return super.shouldOverrideUrlLoading(view, request)
                                 }
                             }
-                            // --- -------------------------------------------- ---
 
+                            // Carga el código HTML en el WebView
                             loadDataWithBaseURL(null, mapHtml, "text/html", "UTF-8", null)
                         }
                     },
                     modifier = Modifier.fillMaxSize()
                 )
+                // --- ----------------------------------------------------------- ---
             }
 
-            // El panel inferior no necesita cambios, el código anterior era correcto
             Column(
                 modifier = Modifier
                     .fillMaxWidth()
@@ -167,6 +164,9 @@ fun ConfirmAddressScreen(
                                     viewModel.onDireccionSeleccionada(direccion)
                                     selectedDireccionId = direccion.idDireccion
                                     mapTouched = false
+                                },
+                                onDeleteClick = {
+                                    viewModel.deleteDireccion(direccion.idDireccion)
                                 }
                             )
                         }
@@ -212,14 +212,12 @@ fun ConfirmAddressScreen(
 
                 Button(
                     onClick = {
-                        viewModel.createPendingOrder(idCarrito, usarDireccionExistenteId = selectedDireccionId)
+                        // Solo guarda la selección y navega. NO crea pedidos.
+                        viewModel.setUsarDireccionExistenteId(selectedDireccionId)
                         navController.navigate("detalles_pago/$idCarrito")
                     },
                     enabled = viewModel.isAddressValid && !uiState.isLoading,
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .height(48.dp)
-                        .padding(top = 8.dp),
+                    modifier = Modifier.fillMaxWidth().height(48.dp).padding(top = 8.dp),
                     colors = ButtonDefaults.buttonColors(containerColor = OrangeAccent),
                     shape = RoundedCornerShape(8.dp)
                 ) {
@@ -230,29 +228,50 @@ fun ConfirmAddressScreen(
     }
 }
 
-// El Card no necesita cambios
 @Composable
 private fun DireccionGuardadaCard(
     direccion: DireccionResponse,
     isSelected: Boolean,
-    onClick: () -> Unit
+    onClick: () -> Unit,
+    onDeleteClick: () -> Unit
 ) {
-    Card(
-        modifier = Modifier
-            .width(200.dp)
-            .clickable(onClick = onClick)
-            .border(
-                width = 2.dp,
-                color = if (isSelected) OrangeAccent else Color.Transparent,
-                shape = RoundedCornerShape(8.dp)
-            ),
-        shape = RoundedCornerShape(8.dp),
-        colors = CardDefaults.cardColors(containerColor = Color(0xFFF0F0F0))
-    ) {
-        Column(modifier = Modifier.padding(12.dp)) {
-            Text(direccion.alias, fontWeight = FontWeight.Bold, color = PurpleDark)
-            Text(direccion.calle, maxLines = 2, fontSize = 12.sp, overflow = TextOverflow.Ellipsis)
-            Text("${direccion.ciudad}, ${direccion.departamento}", fontSize = 12.sp, color = Color.Gray)
+    Box {
+        Card(
+            modifier = Modifier
+                .width(200.dp)
+                .clickable(onClick = onClick)
+                .border(
+                    width = 2.dp,
+                    color = if (isSelected) OrangeAccent else Color.Transparent,
+                    shape = RoundedCornerShape(8.dp)
+                ),
+            shape = RoundedCornerShape(8.dp),
+            colors = CardDefaults.cardColors(containerColor = Color(0xFFF0F0F0))
+        ) {
+            Column(modifier = Modifier.padding(12.dp)) {
+                Text(direccion.alias, fontWeight = FontWeight.Bold, color = PurpleDark, maxLines = 1, overflow = TextOverflow.Ellipsis)
+                Text(direccion.calle, maxLines = 2, fontSize = 12.sp, overflow = TextOverflow.Ellipsis)
+                Text("${direccion.ciudad}, ${direccion.departamento}", fontSize = 12.sp, color = Color.Gray, maxLines = 1, overflow = TextOverflow.Ellipsis)
+            }
+        }
+
+        IconButton(
+            onClick = onDeleteClick,
+            modifier = Modifier
+                .align(Alignment.TopEnd)
+                .padding(4.dp)
+                .size(24.dp)
+                .background(Color.Gray.copy(alpha = 0.5f), CircleShape)
+        ) {
+            // --- 👇👇👇 ¡¡¡LA CORRECCIÓN DE LA HUMILDAD!!! 👇👇👇 ---
+            Icon(
+                imageVector = Icons.Default.Delete, // ESTA ES LA FORMA CORRECTA
+                contentDescription = "Borrar dirección",
+                tint = Color.White,
+                modifier = Modifier.size(16.dp)
+            )
+            // --- -------------------------------------------- ---
         }
     }
 }
+

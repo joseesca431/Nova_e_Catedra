@@ -49,4 +49,10 @@ abstract class RepositoryModule {
     abstract fun bindPedidoRepository(
         pedidoRepositoryImpl: PedidoRepositoryImpl
     ): PedidoRepository
+
+    @Binds
+    @Singleton
+    abstract fun bindUserRepository(
+        userRepositoryImpl: UserRepositoryImpl
+    ): UserRepository
 }

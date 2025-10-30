@@ -7,7 +7,18 @@ import retrofit2.http.Body
 import retrofit2.http.POST
 import retrofit2.http.Path
 
+// --- DTO Auxiliar para combinar las peticiones ---
+data class CreateAndPayRequest(
+    val pedidoRequest: PedidoRequest,
+    val pagoRequest: PagoRequest
+)
+
 interface PedidoApi {
+    // --- 👇👇👇 ¡EL NUEVO ENDPOINT QUE NECESITAREMOS EN SPRING! 👇👇👇 ---
+    @POST("auth/pedido/create-and-pay") // Asumimos esta nueva ruta
+    suspend fun createAndPayOrder(@Body request: CreateAndPayRequest): PedidoResponse
+
+    // --- Endpoints antiguos ---
     @POST("auth/pedido/checkout")
     suspend fun checkout(@Body request: PedidoRequest): PedidoResponse
 
