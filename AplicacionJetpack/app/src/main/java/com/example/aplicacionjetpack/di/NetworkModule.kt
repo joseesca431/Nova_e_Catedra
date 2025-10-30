@@ -1,10 +1,9 @@
+// Ruta: app/src/main/java/com/example/aplicacionjetpack/di/NetworkModule.kt
 package com.example.aplicacionjetpack.di
 
-import com.example.aplicacionjetpack.data.remote.AuthApi
-import com.example.aplicacionjetpack.data.remote.ProductApi
-import com.example.aplicacionjetpack.data.remote.ResenaApi
+// --- 👇👇👇 ¡ASEGÚRATE DE QUE ESTOS IMPORTS ESTÉN! 👇👇👇 ---
+import com.example.aplicacionjetpack.data.api.* // Importa TODAS las APIs
 import com.example.aplicacionjetpack.data.remote.interceptor.AuthInterceptor
-
 import dagger.Module
 import dagger.Provides
 import dagger.hilt.InstallIn
@@ -20,7 +19,7 @@ import javax.inject.Singleton
 @InstallIn(SingletonComponent::class)
 object NetworkModule {
 
-    // Base URL (ajusta si tu ngrok/u otro host cambia)
+    // Cambia esto a tu URL de ngrok si es necesario
     private const val BASE_URL = "https://figurately-sinuous-isla.ngrok-free.dev/"
 
     @Provides
@@ -35,7 +34,7 @@ object NetworkModule {
     @Singleton
     fun provideOkHttpClient(
         loggingInterceptor: HttpLoggingInterceptor,
-        authInterceptor: AuthInterceptor // Hilt inyectará el AuthInterceptor que definimos
+        authInterceptor: AuthInterceptor
     ): OkHttpClient {
         return OkHttpClient.Builder()
             .addInterceptor(loggingInterceptor)
@@ -54,6 +53,7 @@ object NetworkModule {
             .build()
     }
 
+    // --- APIs QUE YA TENÍAS ---
     @Provides
     @Singleton
     fun provideAuthApi(retrofit: Retrofit): AuthApi =
@@ -68,4 +68,21 @@ object NetworkModule {
     @Singleton
     fun provideResenaApi(retrofit: Retrofit): ResenaApi =
         retrofit.create(ResenaApi::class.java)
+
+    // --- 👇👇👇 ¡¡¡LAS APIs QUE FALTABAN!!! 👇👇👇 ---
+
+    @Provides
+    @Singleton
+    fun provideCarritoApi(retrofit: Retrofit): CarritoApi =
+        retrofit.create(CarritoApi::class.java)
+
+    @Provides
+    @Singleton
+    fun provideDireccionApi(retrofit: Retrofit): DireccionApi =
+        retrofit.create(DireccionApi::class.java)
+
+    @Provides
+    @Singleton
+    fun providePedidoApi(retrofit: Retrofit): PedidoApi =
+        retrofit.create(PedidoApi::class.java)
 }

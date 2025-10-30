@@ -35,6 +35,10 @@ import com.example.aplicacionjetpack.R
 import com.example.aplicacionjetpack.data.AuthManager
 import com.example.aplicacionjetpack.ui.viewmodel.ProductDetailViewModel
 import com.example.aplicacionjetpack.ui.viewmodel.ProductDetailUiState
+// --- Imports Añadidos ---
+import com.example.aplicacionjetpack.ui.viewmodel.CarritoViewModel
+import kotlinx.coroutines.flow.collectLatest
+// --- Fin de Imports Añadidos ---
 import java.math.BigDecimal
 import java.text.NumberFormat
 import java.util.*
@@ -44,10 +48,12 @@ import java.util.*
 fun ProductDetailScreen(
     navController: NavController,
     productId: Long,
-    viewModel: ProductDetailViewModel = hiltViewModel()
+    viewModel: ProductDetailViewModel = hiltViewModel(),
+    // 1. Inyectar el CarritoViewModel
+    carritoViewModel: CarritoViewModel = hiltViewModel()
 ) {
     // Estado local de cantidad
-    var quantity by remember { mutableStateOf(0) }
+    var quantity by remember { mutableStateOf(1) } // Iniciar en 1 es más común
 
     // Observa el uiState del ViewModel
     val uiState = viewModel.uiState
@@ -57,16 +63,20 @@ fun ProductDetailScreen(
     var ratingState by remember { mutableStateOf(5.0) } // default 5.0
     var posting by remember { mutableStateOf(false) }
 
-    // --- ¡ELIMINADO! ---
-    // Ya no necesitamos el hack de reflection.
-    /*
-    var currentUserId: Long? by remember { mutableStateOf(null as Long?) }
-    LaunchedEffect(Unit) {
-        try {
-            ... Class.forName ...
-        } catch (_: Throwable) { }
+    // --- 2. Añadir estado para el Snackbar ---
+    val snackbarHostState = remember { SnackbarHostState() }
+    LaunchedEffect(key1 = true) {
+        carritoViewModel.uiEvent.collectLatest { event ->
+            when (event) {
+                is CarritoViewModel.UiEvent.ShowSnackbar -> {
+                    snackbarHostState.showSnackbar(
+                        message = event.message,
+                        duration = SnackbarDuration.Short
+                    )
+                }
+            }
+        }
     }
-    */
 
     // Cargar datos al entrar o cuando cambie productId
     LaunchedEffect(productId) {
@@ -76,6 +86,8 @@ fun ProductDetailScreen(
     }
 
     Scaffold(
+        // --- 3. Añadir el SnackbarHost al Scaffold ---
+        snackbarHost = { SnackbarHost(hostState = snackbarHostState) },
         topBar = {
             TopAppBar(
                 title = {
@@ -233,7 +245,7 @@ fun ProductDetailScreen(
                     ) {
                         Button(
                             onClick = {
-                                if (quantity > 0) quantity--
+                                if (quantity > 1) quantity-- // No permitir bajar de 1
                             },
                             modifier = Modifier.size(50.dp),
                             colors = ButtonDefaults.buttonColors(
@@ -279,9 +291,14 @@ fun ProductDetailScreen(
                         )
                     }
 
+                    // --- 4. Lógica del botón "AGREGAR" actualizada ---
                     Button(
                         onClick = {
-                            navController.navigate("cart")
+                            if (quantity > 0) {
+                                // Llama al CarritoViewModel para añadir el item
+                                carritoViewModel.addItem(productId, quantity)
+                            }
+                            // Ya no navega a "cart" automáticamente
                         },
                         modifier = Modifier
                             .fillMaxWidth()
@@ -303,7 +320,7 @@ fun ProductDetailScreen(
             }
 
 
-            // --- 3. SECCIÓN DE RESEÑAS ---
+            // --- 3. SECCIÓN DE RESEÑAS (Sin cambios) ---
             item {
                 Column(Modifier.padding(top = 8.dp)) {
                     Text(
@@ -323,7 +340,7 @@ fun ProductDetailScreen(
                 }
             }
 
-            // Formulario para añadir reseña
+            // Formulario para añadir reseña (Sin cambios)
             item {
                 Card(
                     modifier = Modifier
@@ -352,21 +369,15 @@ fun ProductDetailScreen(
 
                         Spacer(modifier = Modifier.height(8.dp))
 
-                        // --- ¡LÓGICA DE BOTÓN CORREGIDA! ---
-                        // Leemos el ID de usuario directamente de AuthManager
                         val currentUserId = AuthManager.userId
 
                         Row(
                             modifier = Modifier.fillMaxWidth(),
-                            // Alineamos el botón a la derecha
                             horizontalArrangement = Arrangement.End,
                             verticalAlignment = Alignment.CenterVertically
                         ) {
-                            // Ya no hay 'if/else'. Asumimos que el usuario está logueado.
                             Button(
                                 onClick = {
-                                    // El botón solo está habilitado si currentUserId no es nulo,
-                                    // así que podemos usar '!!' con seguridad aquí.
                                     val uid = currentUserId!!
                                     posting = true
                                     viewModel.addReview(productId, uid, ratingState, comentarioState.text)
@@ -374,7 +385,6 @@ fun ProductDetailScreen(
                                     ratingState = 5.0
                                     posting = false
                                 },
-                                // Habilitado solo si NO está 'posteando' Y SÍ tenemos un userId
                                 enabled = !posting && currentUserId != null
                             ) {
                                 Text("Publicar")
@@ -384,7 +394,7 @@ fun ProductDetailScreen(
                 }
             }
 
-            // --- 4. LISTA DE RESEÑAS ---
+            // --- 4. LISTA DE RESEÑAS (Sin cambios) ---
             items(
                 items = uiState.reviews,
                 key = { it.idResena }
@@ -415,7 +425,7 @@ fun ProductDetailScreen(
                 }
             }
 
-            // --- 5. FOOTER DE PAGINACIÓN ---
+            // --- 5. FOOTER DE PAGINACIÓN (Sin cambios) ---
             item {
                 Spacer(modifier = Modifier.height(8.dp))
                 when {

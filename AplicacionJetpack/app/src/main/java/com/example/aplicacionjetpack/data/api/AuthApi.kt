@@ -1,4 +1,4 @@
-package com.example.aplicacionjetpack.data.remote
+package com.example.aplicacionjetpack.data.api
 
 import com.example.aplicacionjetpack.data.dto.LoginRequest
 import com.example.aplicacionjetpack.data.dto.RegisterRequest
@@ -7,11 +7,15 @@ import retrofit2.http.POST
 
 interface AuthApi {
 
-    // Llama al endpoint de login y espera un String (token)
+    /**
+     * Corresponde a tu @PostMapping("/login") en AuthController
+     */
     @POST("auth/login")
-    suspend fun login(@Body request: LoginRequest): String // <-- Espera String
+    suspend fun login(@Body loginRequest: LoginRequest): String // Devuelve un token JWT
 
-    // Llama al endpoint de registro y espera un String (token)
+    /**
+     * Corresponde a tu @PostMapping("/register") en AuthController
+     */
     @POST("auth/register")
-    suspend fun register(@Body request: RegisterRequest): String // <-- Espera String
+    suspend fun register(@Body registerRequest: RegisterRequest): String // Devuelve un token JWT
 }

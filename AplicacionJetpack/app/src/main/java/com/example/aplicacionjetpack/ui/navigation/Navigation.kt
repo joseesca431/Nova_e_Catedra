@@ -1,21 +1,19 @@
 package com.example.aplicacionjetpack.ui.navigation
 
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.remember
 import androidx.hilt.navigation.compose.hiltViewModel
+import androidx.navigation.NavBackStackEntry
+import androidx.navigation.NavController
 import androidx.navigation.NavType
 import androidx.navigation.compose.NavHost
 import androidx.navigation.compose.composable
 import androidx.navigation.compose.rememberNavController
 import androidx.navigation.navArgument
-// --- Importa TODOS tus Screens ---
-import com.example.aplicacionjetpack.ui.screens.* // Importa todos
-// --- Importa TODOS tus ViewModels ---
-import com.example.aplicacionjetpack.ui.viewmodel.LoginViewModel
-import com.example.aplicacionjetpack.ui.viewmodel.RegisterViewModel
-import com.example.aplicacionjetpack.ui.viewmodel.HomeViewModel
-import com.example.aplicacionjetpack.ui.viewmodel.SearchViewModel
-// Si en algún punto necesitas referenciar ProductDetailViewModel aquí, puedes importarlo:
-// import com.example.aplicacionjetpack.ui.viewmodel.ProductDetailViewModel
+import com.example.aplicacionjetpack.ui.screens.*
+import com.example.aplicacionjetpack.ui.viewmodel.*
+
+// NO MÁS HELPERS COMPLICADOS NI GRAFOS ANIDADOS
 
 @Composable
 fun AppNavigation() {
@@ -29,7 +27,6 @@ fun AppNavigation() {
             SplashScreen(navController = navController)
         }
 
-        // --- PANTALLA LOGIN ---
         composable("login") {
             val viewModel: LoginViewModel = hiltViewModel()
             LoginScreen(
@@ -41,7 +38,6 @@ fun AppNavigation() {
             )
         }
 
-        // --- PANTALLA REGISTRO ---
         composable("register") {
             val viewModel: RegisterViewModel = hiltViewModel()
             RegisterScreen(
@@ -65,7 +61,6 @@ fun AppNavigation() {
             )
         }
 
-        // --- PANTALLA HOME (CORREGIDA) ---
         composable("home") {
             val viewModel: HomeViewModel = hiltViewModel()
             HomeScreen(
@@ -73,74 +68,103 @@ fun AppNavigation() {
                 uiState = viewModel.uiState,
                 onRefresh = viewModel::refreshProducts,
                 onProductClick = { product ->
-                    // Navega al detalle pasando el ID real
                     navController.navigate("product_detail/${product.idProducto}")
                 },
                 onSearchClick = {
-                    navController.navigate("busqueda")
+                    // navController.navigate("busqueda")
                 }
             )
         }
 
-        // --- PANTALLA BÚSQUEDA (CORREGIDA) ---
-        composable("busqueda") {
-            val viewModel: SearchViewModel = hiltViewModel()
-            BusquedaScreen(
-                navController = navController,
-                uiState = viewModel.uiState,
-                onQueryChange = viewModel::onSearchQueryChange,
-                onProductClick = { product ->
-                    navController.navigate("product_detail/${product.idProducto}")
-                }
-            )
-        }
-
-        // --- PANTALLA DETALLE PRODUCTO (RUTA ACTUALIZADA, ARREGLADA) ---
         composable(
             route = "product_detail/{productId}",
             arguments = listOf(navArgument("productId") { type = NavType.LongType })
         ) { backStackEntry ->
-            // Extrae el productId de los argumentos (si no viene, queda 0L)
             val productId = backStackEntry.arguments?.getLong("productId") ?: 0L
-
-            /*
-             * Nota:
-             * - Tu ProductDetailScreen, tal como te entregué, tiene la firma:
-             *   ProductDetailScreen(navController: NavController, productId: Long, viewModel: ProductDetailViewModel = hiltViewModel())
-             *
-             * - Por eso aquí basta con pasar navController y productId. El screen pedirá su ViewModel con hiltViewModel().
-             *
-             * Si en tu proyecto prefieres manejar el ViewModel desde aquí y pasarlo al Screen,
-             * descomenta la siguiente línea y pásalo:
-             *
-             * val detailVm: ProductDetailViewModel = hiltViewModel()
-             * ProductDetailScreen(navController = navController, productId = productId, viewModel = detailVm)
-             */
-
             ProductDetailScreen(
                 navController = navController,
                 productId = productId
             )
         }
 
-        // --- OTRAS PANTALLAS (Aún no refactorizadas) ---
-        composable("profile") {
-            ProfileScreen(navController = navController)
-        }
         composable("cart") {
-            CarritoScreen(navController = navController)
+            CarritoScreen(
+                navController = navController,
+                // Le pasamos la lógica de navegación directamente aquí
+                onPagarClick = { idCarrito ->
+                    // --- LA ÚNICA LÓGICA QUE IMPORTA ---
+                    // Solo navegamos si el ID es válido.
+                    if (idCarrito > 0) {
+                        // Navegamos directamente a la primera pantalla del flujo.
+                        navController.navigate("confirm_address/$idCarrito")
+                    }
+                    // Si idCarrito es 0 o nulo, NO HACE NADA. No hay crash.
+                }
+            )
         }
-        composable("confirm_address") {
-            ConfirmAddressScreen(navController = navController)
+
+        // --- EL CHECKOUT SIMPLIFICADO, DIRECTO Y FUNCIONAL ---
+        composable(
+            route = "confirm_address/{idCarrito}",
+            arguments = listOf(navArgument("idCarrito") { type = NavType.LongType })
+        ) { backStackEntry ->
+            val idCarrito = backStackEntry.arguments?.getLong("idCarrito") ?: 0L
+            ConfirmAddressScreen(
+                navController = navController,
+                idCarrito = idCarrito,
+                viewModel = hiltViewModel() // Hilt crea la primera instancia aquí.
+            )
         }
-        composable("detalles_pago") {
-            DetallesPagoScreen(navController = navController)
+
+        composable(
+            route = "detalles_pago/{idCarrito}",
+            arguments = listOf(navArgument("idCarrito") { type = NavType.LongType })
+        ) { backStackEntry ->
+            val idCarrito = backStackEntry.arguments?.getLong("idCarrito") ?: 0L
+
+            // Hilt es inteligente: busca la instancia de ViewModel creada en la pantalla anterior.
+            val checkoutViewModel: CheckoutViewModel = hiltViewModel(
+                remember(backStackEntry) {
+                    navController.getBackStackEntry("confirm_address/{idCarrito}")
+                }
+            )
+
+            DetallesPagoScreen(
+                navController = navController,
+                idCarrito = idCarrito,
+                checkoutViewModel = checkoutViewModel
+                // El CarritoViewModel se crea dentro con hiltViewModel() por defecto.
+            )
         }
-        composable("pago") {
-            PagoScreen(navController = navController)
+
+        composable(
+            route = "pago/{idCarrito}",
+            arguments = listOf(navArgument("idCarrito") { type = NavType.LongType })
+        ) { backStackEntry ->
+            val idCarrito = backStackEntry.arguments?.getLong("idCarrito") ?: 0L
+
+            // Reutilizamos el mismo ViewModel del flujo.
+            val checkoutViewModel: CheckoutViewModel = hiltViewModel(
+                remember(backStackEntry) {
+                    navController.getBackStackEntry("confirm_address/{idCarrito}")
+                }
+            )
+
+            PagoScreen(
+                navController = navController,
+                idCarrito = idCarrito,
+                viewModel = checkoutViewModel
+                // El CarritoViewModel se crea dentro con hiltViewModel() por defecto.
+            )
         }
+        // --- -------------------------------------------- ---
+
         composable("pago_finalizado") {
             PagoFinalizadoScreen(navController = navController)
+        }
+
+        composable("profile") {
+            ProfileScreen(navController = navController)
         }
     }
 }

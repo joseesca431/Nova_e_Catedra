@@ -1,8 +1,9 @@
-package com.example.aplicacionjetpack.data.remote
+// Ruta: app/src/main/java/com/example/aplicacionjetpack/data/api/ResenaApi.kt
+package com.example.aplicacionjetpack.data.api
 
 import com.example.aplicacionjetpack.data.dto.PagedResponse
-import com.example.aplicacionjetpack.data.dto.ResenaResponse
 import com.example.aplicacionjetpack.data.dto.ResenaRequest
+import com.example.aplicacionjetpack.data.dto.ResenaResponse
 import retrofit2.http.Body
 import retrofit2.http.GET
 import retrofit2.http.POST
@@ -20,6 +21,7 @@ interface ResenaApi {
     @GET("auth/resenas/producto/{id}")
     suspend fun getReviewsByProduct(@Path("id") productId: Long): List<ResenaResponse>
 
+    // --- ¡¡¡LA CORRECCIÓN DEFINITIVA ESTÁ AQUÍ!!! ---
     @POST("auth/resenas")
-    suspend fun postResena(@Body request: ResenaRequest): ResenaResponse
+    suspend fun postReview(@Body request: ResenaRequest): ResenaResponse // <-- RENOMBRADO A postReview
 }

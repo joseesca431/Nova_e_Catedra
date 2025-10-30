@@ -3,7 +3,7 @@ package com.example.aplicacionjetpack.data.repository
 import android.util.Log
 import com.example.aplicacionjetpack.data.dto.PagedResponse
 import com.example.aplicacionjetpack.data.dto.ProductResponse
-import com.example.aplicacionjetpack.data.remote.ProductApi
+import com.example.aplicacionjetpack.data.api.ProductApi
 import javax.inject.Inject
 import kotlin.Result
 

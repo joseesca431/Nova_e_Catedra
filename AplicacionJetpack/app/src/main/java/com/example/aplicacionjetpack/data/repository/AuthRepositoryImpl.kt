@@ -3,12 +3,12 @@ package com.example.aplicacionjetpack.data.repository
 import android.util.Log
 import com.example.aplicacionjetpack.data.dto.LoginRequest
 import com.example.aplicacionjetpack.data.dto.RegisterRequest
-import com.example.aplicacionjetpack.data.remote.AuthApi
+import com.example.aplicacionjetpack.data.api.AuthApi
 import javax.inject.Inject
 import kotlin.Result // Asegúrate de importar kotlin.Result
 
-class AuthRepositoryImpl @Inject constructor(
-    private val authApi: AuthApi // Hilt inyectará la implementación de AuthApi
+class AuthRepositoryImpl @Inject constructor( // <-- ¡AÑADE @Inject AQUÍ!
+    private val authApi: AuthApi
 ) : AuthRepository {
 
     override suspend fun login(username: String, password: String): Result<String> {

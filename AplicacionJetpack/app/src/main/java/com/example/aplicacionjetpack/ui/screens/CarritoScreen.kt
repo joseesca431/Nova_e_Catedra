@@ -12,40 +12,34 @@ import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.navigation.NavController
+import coil.compose.AsyncImage
 import com.example.aplicacionjetpack.R
-import com.example.aplicacionjetpack.model.CartItem
-
-
-// Lista de ejemplo de items en el carrito
-val sampleCartItems = listOf(
-    CartItem(
-        name = "Ejemplo simulado",
-        price = "$0.00",
-        quantity = "Cantidad: 0",
-        imageResId = R.drawable.ic_producto
-    )
-)
+import com.example.aplicacionjetpack.data.dto.CarritoItemResponse
+import com.example.aplicacionjetpack.ui.theme.OrangeAccent
+import com.example.aplicacionjetpack.ui.theme.PurpleDark
+import com.example.aplicacionjetpack.ui.viewmodel.CarritoViewModel
+import java.text.NumberFormat
+import java.util.Locale
 
 @Composable
-fun CarritoScreen(navController: NavController) {
-    var selectedTab by remember { mutableStateOf("Carrito") }
-    var cartItems by remember { mutableStateOf(sampleCartItems) }
+fun CarritoScreen(
+    navController: NavController,
+    viewModel: CarritoViewModel = hiltViewModel(),
+    onPagarClick: (Long) -> Unit
+) {
+    val uiState = viewModel.uiState
 
-    Scaffold(
-        bottomBar = {
-            HomeBottomBar(
-                navController = navController,
-                selectedTab = selectedTab,
-                onTabSelected = { selectedTab = it }
-            )
-        }
-    ) { paddingValues ->
+    // No necesitas LaunchedEffect(Unit) aquí porque el ViewModel ya lo hace en su 'init'.
+
+    Scaffold { paddingValues ->
         Column(
             modifier = Modifier
                 .fillMaxSize()
@@ -53,7 +47,6 @@ fun CarritoScreen(navController: NavController) {
                 .padding(paddingValues),
             horizontalAlignment = Alignment.CenterHorizontally
         ) {
-            // Título "MI CARRITO"
             Text(
                 text = "MI CARRITO",
                 fontSize = 20.sp,
@@ -62,37 +55,53 @@ fun CarritoScreen(navController: NavController) {
                 modifier = Modifier.padding(vertical = 24.dp)
             )
 
-            // Lista de productos en el carrito
-            LazyColumn(
-                modifier = Modifier
-                    .weight(1f)
-                    .fillMaxWidth()
-                    .padding(horizontal = 16.dp),
-                verticalArrangement = Arrangement.spacedBy(12.dp)
-            ) {
-                items(cartItems) { item ->
-                    CartItemCard(
-                        item = item,
-                        onRemove = { /* Acción para eliminar item */ }
-                    )
+            when {
+                uiState.isLoading -> {
+                    Box(modifier = Modifier.weight(1f), contentAlignment = Alignment.Center) {
+                        CircularProgressIndicator()
+                    }
+                }
+                uiState.error != null -> {
+                    Box(modifier = Modifier.weight(1f), contentAlignment = Alignment.Center) {
+                        Text(text = uiState.error)
+                    }
+                }
+                uiState.items.isEmpty() -> {
+                    Box(modifier = Modifier.weight(1f), contentAlignment = Alignment.Center) {
+                        Text(text = "Tu carrito está vacío")
+                    }
+                }
+                else -> {
+                    LazyColumn(
+                        modifier = Modifier
+                            .weight(1f)
+                            .fillMaxWidth()
+                            .padding(horizontal = 16.dp),
+                        verticalArrangement = Arrangement.spacedBy(12.dp)
+                    ) {
+                        items(uiState.items, key = { it.idCarritoItem }) { item ->
+                            CartItemCard(
+                                item = item,
+                                onRemove = { viewModel.removeItem(item.idCarritoItem) }
+                            )
+                        }
+                    }
                 }
             }
 
-            // Sección de Total y Botón
             Column(
                 modifier = Modifier
                     .fillMaxWidth()
                     .padding(16.dp)
             ) {
-                // Card del Total
+                val totalFormatted = NumberFormat.getCurrencyInstance(Locale.US).format(uiState.total)
+
                 Card(
                     modifier = Modifier
                         .fillMaxWidth()
                         .padding(bottom = 12.dp),
                     shape = RoundedCornerShape(12.dp),
-                    colors = CardDefaults.cardColors(
-                        containerColor = PurpleDark
-                    )
+                    colors = CardDefaults.cardColors(containerColor = PurpleDark)
                 ) {
                     Row(
                         modifier = Modifier
@@ -101,60 +110,42 @@ fun CarritoScreen(navController: NavController) {
                         horizontalArrangement = Arrangement.SpaceBetween,
                         verticalAlignment = Alignment.CenterVertically
                     ) {
-                        Text(
-                            text = "TOTAL:",
-                            fontSize = 18.sp,
-                            fontWeight = FontWeight.Bold,
-                            color = Color.White
-                        )
-                        Text(
-                            text = "$0.00",
-                            fontSize = 24.sp,
-                            fontWeight = FontWeight.Bold,
-                            color = Color.White
-                        )
+                        Text("TOTAL:", fontSize = 18.sp, fontWeight = FontWeight.Bold, color = Color.White)
+                        Text(totalFormatted, fontSize = 24.sp, fontWeight = FontWeight.Bold, color = Color.White)
                     }
                 }
 
-                // Botón PAGAR
+                // --- 👇👇👇 ¡¡¡EL CÓDIGO DE LA VICTORIA ESTÁ AQUÍ!!! 👇👇👇 ---
                 Button(
                     onClick = {
-                        // NAVEGACIÓN A HOME
-                        navController.navigate("confirm_address") {
-                            popUpTo("start") { inclusive = true } // Limpia la pila para que no se pueda volver
-                            launchSingleTop = true
-                        }
+                        // --- 👇 La llamada ahora es más simple y segura 👇 ---
+                        val idCarritoValido = uiState.carrito?.idCarrito
+                        // La función onPagarClick ahora tiene la lógica de seguridad
+                        onPagarClick(idCarritoValido ?: 0L)
                     },
+                    enabled = uiState.items.isNotEmpty() && !uiState.isLoading,
                     modifier = Modifier
                         .fillMaxWidth()
                         .height(50.dp),
-                    colors = ButtonDefaults.buttonColors(
-                        containerColor = OrangeAccent
-                    ),
+                    colors = ButtonDefaults.buttonColors(containerColor = OrangeAccent),
                     shape = RoundedCornerShape(8.dp)
                 ) {
-                    Text(
-                        text = "PAGAR",
-                        color = Color.White,
-                        fontSize = 16.sp,
-                        fontWeight = FontWeight.Bold
-                    )
+                    Text("PAGAR", color = Color.White, fontSize = 16.sp, fontWeight = FontWeight.Bold)
                 }
+                // --- --------------------------------------------------- ---
             }
         }
     }
 }
 
 @Composable
-fun CartItemCard(item: CartItem, onRemove: () -> Unit) {
+fun CartItemCard(item: CarritoItemResponse, onRemove: () -> Unit) {
     Card(
         modifier = Modifier
             .fillMaxWidth()
             .height(80.dp),
         shape = RoundedCornerShape(8.dp),
-        colors = CardDefaults.cardColors(
-            containerColor = Color.White
-        ),
+        colors = CardDefaults.cardColors(containerColor = Color.White),
         elevation = CardDefaults.cardElevation(defaultElevation = 2.dp)
     ) {
         Row(
@@ -163,40 +154,25 @@ fun CartItemCard(item: CartItem, onRemove: () -> Unit) {
                 .padding(12.dp),
             verticalAlignment = Alignment.CenterVertically
         ) {
-            // Imagen del producto
-            Image(
-                painter = painterResource(id = item.imageResId),
-                contentDescription = item.name,
+            AsyncImage(
+                model = item.producto?.imagen,
+                contentDescription = item.producto?.nombre,
+                placeholder = painterResource(id = R.drawable.ic_producto),
                 modifier = Modifier
                     .size(56.dp)
                     .background(Color(0xFFF0F0F0), RoundedCornerShape(8.dp))
+                    .clip(RoundedCornerShape(8.dp))
             )
-
             Spacer(modifier = Modifier.width(12.dp))
-
-            // Información del producto
             Column(
-                modifier = Modifier.weight(1f)
+                modifier = Modifier.weight(1f),
+                verticalArrangement = Arrangement.Center
             ) {
-                Text(
-                    text = item.name,
-                    fontSize = 14.sp,
-                    fontWeight = FontWeight.Medium,
-                    color = Color.Black
-                )
+                Text(item.producto?.nombre ?: "Producto", fontSize = 14.sp, fontWeight = FontWeight.Medium, color = Color.Black)
+                Text("Cantidad: ${item.cantidad}", fontSize = 12.sp, color = Color.Gray)
             }
-
-            // Botón de eliminar
-            IconButton(
-                onClick = onRemove,
-                modifier = Modifier.size(40.dp)
-            ) {
-                Icon(
-                    imageVector = Icons.Default.Delete,
-                    contentDescription = "Eliminar",
-                    tint = Color.Gray,
-                    modifier = Modifier.size(24.dp)
-                )
+            IconButton(onClick = onRemove, modifier = Modifier.size(40.dp)) {
+                Icon(Icons.Default.Delete, contentDescription = "Eliminar", tint = Color.Gray, modifier = Modifier.size(24.dp))
             }
         }
     }

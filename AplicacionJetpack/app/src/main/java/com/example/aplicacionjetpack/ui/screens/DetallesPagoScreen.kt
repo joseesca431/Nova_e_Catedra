@@ -2,45 +2,59 @@ package com.example.aplicacionjetpack.ui.screens
 
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.*
+import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.*
-import androidx.compose.runtime.*
+import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.navigation.NavController
+import coil.compose.AsyncImage
 import com.example.aplicacionjetpack.R
+import com.example.aplicacionjetpack.data.dto.CarritoItemResponse
+import com.example.aplicacionjetpack.ui.theme.OrangeAccent
+import com.example.aplicacionjetpack.ui.theme.PurpleDark
+import com.example.aplicacionjetpack.ui.viewmodel.CarritoViewModel // <-- IMPORTANTE
+import com.example.aplicacionjetpack.ui.viewmodel.CheckoutViewModel
+import java.text.NumberFormat
+import java.util.Locale
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
-fun DetallesPagoScreen(navController: NavController) {
+fun DetallesPagoScreen(
+    navController: NavController,
+    idCarrito: Long,
+    checkoutViewModel: CheckoutViewModel,
+    // --- 👇👇👇 ¡AHORA LA PANTALLA RECIBE EL VIEWMODEL DEL CARRITO! 👇👇👇 ---
+    carritoViewModel: CarritoViewModel = hiltViewModel()
+) {
+    val checkoutUiState = checkoutViewModel.uiState
+    // --- Usamos también el estado del carrito ---
+    val carritoUiState = carritoViewModel.uiState
+
+    // TODO: Cargar datos del perfil de usuario desde un UserViewModel o AuthManager
+    val nombreUsuario = "Eduardo Ramírez"
+    val correoUsuario = "correo@ejemplo.com"
+    val telefonoUsuario = "+503 7777-7777"
+
     Scaffold(
         topBar = {
             TopAppBar(
-                title = {
-                    Text(
-                        text = "Detalle del pago",
-                        fontSize = 18.sp,
-                        color = Color(0xFF2D1B4E),
-                        fontWeight = FontWeight.Medium
-                    )
-                },
+                title = { Text("Detalle del pago", fontSize = 18.sp, color = PurpleDark, fontWeight = FontWeight.Medium) },
                 navigationIcon = {
                     IconButton(onClick = { navController.navigateUp() }) {
-                        Icon(
-                            painter = painterResource(id = R.drawable.ic_atras),
-                            contentDescription = "Atrás",
-                            tint = Color(0xFF2D1B4E)
-                        )
+                        Icon(painter = painterResource(id = R.drawable.ic_atras), contentDescription = "Atrás", tint = PurpleDark)
                     }
                 },
-                colors = TopAppBarDefaults.topAppBarColors(
-                    containerColor = Color.White
-                )
+                colors = TopAppBarDefaults.topAppBarColors(containerColor = Color.White)
             )
         }
     ) { paddingValues ->
@@ -49,134 +63,82 @@ fun DetallesPagoScreen(navController: NavController) {
                 .fillMaxSize()
                 .background(Color.White)
                 .padding(paddingValues)
-                .padding(24.dp),
-            verticalArrangement = Arrangement.spacedBy(12.dp)
+                .padding(horizontal = 24.dp, vertical = 16.dp)
         ) {
-            Spacer(modifier = Modifier.height(8.dp))
+            // --- SECCIÓN DE DETALLES DE ENTREGA ---
+            Text("DETALLES DE ENTREGA", style = MaterialTheme.typography.titleMedium, color = OrangeAccent, modifier = Modifier.padding(bottom = 16.dp))
 
-            // Campo Nombre
-            Column(modifier = Modifier.fillMaxWidth()) {
-                Text(
-                    text = "Nombre",
-                    fontSize = 12.sp,
-                    color = Color.Gray,
-                    fontWeight = FontWeight.Medium
-                )
-                Text(
-                    text = "XXXXXXX-XXXX-XXXX-XXXXXX",
-                    fontSize = 14.sp,
-                    color = Color.Black,
-                    fontWeight = FontWeight.Normal
-                )
+            InfoRow(label = "Nombre", value = nombreUsuario)
+            InfoRow(label = "Correo", value = correoUsuario)
+            InfoRow(label = "Teléfono", value = telefonoUsuario)
+            InfoRow(label = "Dirección", value = "${checkoutUiState.direccion}, ${checkoutUiState.municipio}, ${checkoutUiState.departamento}")
+
+            Divider(modifier = Modifier.padding(vertical = 20.dp))
+
+            // --- SECCIÓN RESUMEN DE COMPRA (AHORA ES UNA LISTA) ---
+            Text("RESUMEN DE COMPRA", style = MaterialTheme.typography.titleMedium, color = OrangeAccent, modifier = Modifier.padding(bottom = 16.dp))
+
+            // --- 👇👇👇 ¡LA LISTA DE PRODUCTOS REALES! 👇👇👇 ---
+            LazyColumn(modifier = Modifier.weight(1f)) {
+                items(carritoUiState.items) { item ->
+                    ProductoResumenItem(item)
+                }
             }
+            // --- -------------------------------------------- ---
 
-            // Campo Correo
-            Column(modifier = Modifier.fillMaxWidth()) {
-                Text(
-                    text = "Correo",
-                    fontSize = 12.sp,
-                    color = Color.Gray,
-                    fontWeight = FontWeight.Medium
-                )
-                Text(
-                    text = "xxxxxx@gmail.com",
-                    fontSize = 14.sp,
-                    color = Color.Black,
-                    fontWeight = FontWeight.Normal
-                )
-            }
-
-            // Campo Teléfono
-            Column(modifier = Modifier.fillMaxWidth()) {
-                Text(
-                    text = "Teléfono",
-                    fontSize = 12.sp,
-                    color = Color.Gray,
-                    fontWeight = FontWeight.Medium
-                )
-                Text(
-                    text = "+503 0000-0000",
-                    fontSize = 14.sp,
-                    color = Color.Black,
-                    fontWeight = FontWeight.Normal
-                )
-            }
-
-            // Campo Dirección
-            Column(modifier = Modifier.fillMaxWidth()) {
-                Text(
-                    text = "Dirección",
-                    fontSize = 12.sp,
-                    color = Color.Gray,
-                    fontWeight = FontWeight.Medium
-                )
-                Text(
-                    text = "Departamento XXXXXX",
-                    fontSize = 14.sp,
-                    color = Color.Black,
-                    fontWeight = FontWeight.Normal
-                )
-            }
-
-            Spacer(modifier = Modifier.height(8.dp))
-
-            // Sección Productos
-            Text(
-                text = "Productos:",
-                fontSize = 16.sp,
-                color = Color(0xFFFF6B35),
-                fontWeight = FontWeight.SemiBold
-            )
-
-            Spacer(modifier = Modifier.weight(1f))
-
-
-            // Total
+            // --- SECCIÓN TOTAL ---
             Row(
-                modifier = Modifier.fillMaxWidth(),
+                modifier = Modifier.fillMaxWidth().padding(top = 20.dp, bottom = 24.dp),
                 horizontalArrangement = Arrangement.SpaceBetween,
                 verticalAlignment = Alignment.CenterVertically
             ) {
-                Text(
-                    text = "TOTAL:",
-                    fontSize = 18.sp,
-                    color = Color(0xFF2D1B4E),
-                    fontWeight = FontWeight.Bold
-                )
-                Text(
-                    text = "$0.00",
-                    fontSize = 24.sp,
-                    color = Color(0xFF2D1B4E),
-                    fontWeight = FontWeight.Bold
-                )
+                Text("TOTAL:", style = MaterialTheme.typography.headlineSmall, color = PurpleDark, fontWeight = FontWeight.Bold)
+                // --- 👇👇👇 ¡EL TOTAL REAL! 👇👇👇 ---
+                val totalFormatted = NumberFormat.getCurrencyInstance(Locale.US).format(carritoUiState.total)
+                Text(totalFormatted, style = MaterialTheme.typography.headlineMedium, color = PurpleDark, fontWeight = FontWeight.ExtraBold)
+                // --- -------------------------- ---
             }
 
-            Spacer(modifier = Modifier.height(16.dp))
-
-            // Botón Continuar
+            // --- BOTÓN CONTINUAR ---
             Button(
-                onClick = {
-                    // Navegación futura - puedes definir a dónde quieres que vaya
-                    navController.navigate("pago") {
-                        popUpTo("confirm_address") { inclusive = true }
-                        launchSingleTop = true
-                    }
-                },
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .height(48.dp),
-                colors = ButtonDefaults.buttonColors(
-                    containerColor = Color(0xFFFF801F)
-                ),
+                onClick = { navController.navigate("pago/$idCarrito") },
+                modifier = Modifier.fillMaxWidth().height(48.dp),
+                colors = ButtonDefaults.buttonColors(containerColor = OrangeAccent),
                 shape = RoundedCornerShape(8.dp)
             ) {
-                Text(
-                    text = "Continuar",
-                    color = Color.White,
-                    fontSize = 16.sp,
-                    fontWeight = FontWeight.Bold
-                )
+                Text("Continuar", color = Color.White, fontSize = 16.sp, fontWeight = FontWeight.Bold)
             }
         }
+    }
+}
+
+// --- Componentes auxiliares para limpiar el código ---
+
+@Composable
+private fun InfoRow(label: String, value: String) {
+    Column(modifier = Modifier.fillMaxWidth().padding(bottom = 12.dp)) {
+        Text(label, style = MaterialTheme.typography.labelSmall, color = Color.Gray)
+        Text(value, style = MaterialTheme.typography.bodyLarge, color = Color.Black)
+    }
+}
+
+@Composable
+private fun ProductoResumenItem(item: CarritoItemResponse) {
+    Row(
+        modifier = Modifier.fillMaxWidth().padding(vertical = 8.dp),
+        verticalAlignment = Alignment.CenterVertically
+    ) {
+        AsyncImage(
+            model = item.producto?.imagen,
+            contentDescription = item.producto?.nombre,
+            modifier = Modifier.size(50.dp).clip(RoundedCornerShape(8.dp)).background(Color.LightGray)
+        )
+        Spacer(modifier = Modifier.width(16.dp))
+        Column(modifier = Modifier.weight(1f)) {
+            Text(item.producto?.nombre ?: "Producto", fontWeight = FontWeight.SemiBold, maxLines = 1)
+            Text("Cantidad: ${item.cantidad}", style = MaterialTheme.typography.bodySmall, color = Color.Gray)
+        }
+        val priceFormatted = NumberFormat.getCurrencyInstance(Locale.US).format(item.producto?.precio)
+        Text(priceFormatted, fontWeight = FontWeight.Medium)
     }
 }

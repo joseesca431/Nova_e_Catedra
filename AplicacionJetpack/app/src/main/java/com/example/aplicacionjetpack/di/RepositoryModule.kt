@@ -1,11 +1,7 @@
+// Ruta: app/src/main/java/com/example/aplicacionjetpack/di/RepositoryModule.kt
 package com.example.aplicacionjetpack.di
 
-import com.example.aplicacionjetpack.data.repository.AuthRepository
-import com.example.aplicacionjetpack.data.repository.AuthRepositoryImpl
-import com.example.aplicacionjetpack.data.repository.ProductRepository
-import com.example.aplicacionjetpack.data.repository.ProductRepositoryImpl
-import com.example.aplicacionjetpack.data.repository.ResenaRepository
-import com.example.aplicacionjetpack.data.repository.ResenaRepositoryImpl
+import com.example.aplicacionjetpack.data.repository.* // Importa todo del paquete
 import dagger.Binds
 import dagger.Module
 import dagger.hilt.InstallIn
@@ -25,16 +21,32 @@ abstract class RepositoryModule {
     @Binds
     @Singleton
     abstract fun bindProductRepository(
+        // --- ¡¡¡LA CORRECCIÓN DEFINITIVA!!! ---
+        // Ahora Hilt sabe que para un ProductRepository, debe usar un ProductRepositoryImpl.
         productRepositoryImpl: ProductRepositoryImpl
     ): ProductRepository
 
-    // dentro del módulo abstracto
     @Binds
     @Singleton
     abstract fun bindResenaRepository(
         resenaRepositoryImpl: ResenaRepositoryImpl
     ): ResenaRepository
 
+    @Binds
+    @Singleton
+    abstract fun bindCarritoRepository(
+        carritoRepositoryImpl: CarritoRepositoryImpl
+    ): CarritoRepository
 
-    // TODO: Añadir @Binds para ProductRepository, CarritoRepository, etc. aquí
+    @Binds
+    @Singleton
+    abstract fun bindDireccionRepository(
+        direccionRepositoryImpl: DireccionRepositoryImpl
+    ): DireccionRepository
+
+    @Binds
+    @Singleton
+    abstract fun bindPedidoRepository(
+        pedidoRepositoryImpl: PedidoRepositoryImpl
+    ): PedidoRepository
 }

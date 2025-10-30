@@ -156,12 +156,27 @@ class RegisterViewModel @Inject constructor(
         viewModelScope.launch {
             uiState = uiState.copy(isLoading = true, error = null)
 
+            // --- 👇👇👇 ¡¡¡LA CORRECCIÓN DEFINITIVA ESTÁ AQUÍ!!! 👇👇👇 ---
+            // Convierte la fecha del formato de la UI ("dd/MM/yyyy") al formato de la API ("yyyy-MM-dd")
+            val fechaApi = try {
+                val uiFormatter = DateTimeFormatter.ofPattern("dd/MM/yyyy")
+                val apiFormatter = DateTimeFormatter.ISO_LOCAL_DATE // Formato "yyyy-MM-dd"
+                LocalDate.parse(uiState.fechaNacimiento.trim(), uiFormatter).format(apiFormatter)
+            } catch (e: DateTimeParseException) {
+                Log.e(TAG, "Error al parsear la fecha de la UI", e)
+                uiState = uiState.copy(isLoading = false, error = "Formato de fecha inválido.")
+                return@launch // Detiene la ejecución si la fecha es inválida
+            }
+            // --- -------------------------------------------------------- ---
+
+
             val request = RegisterRequest(
                 primerNombre = uiState.primerNombre.trim(),
                 segundoNombre = uiState.segundoNombre.trim().takeIf { it.isNotEmpty() },
                 primerApellido = uiState.primerApellido.trim(),
                 segundoApellido = uiState.segundoApellido.trim().takeIf { it.isNotEmpty() },
-                fechaNacimiento = uiState.fechaNacimiento.trim(),
+                // Usa la fecha con el formato correcto para la API
+                fechaNacimiento = fechaApi,
                 email = uiState.email.trim(),
                 username = uiState.username.trim(),
                 password = uiState.password.trim(),
@@ -176,7 +191,8 @@ class RegisterViewModel @Inject constructor(
 
             result.onSuccess { token ->
                 Log.d(TAG, "Registro Exitoso. Token guardado.")
-                AuthManager.authToken = token
+                // Aquí podrías querer guardar el token en el AuthManager o TokenManager
+                // AuthManager.authToken = token
                 uiState = uiState.copy(isLoading = false, registerSuccess = true)
             }.onFailure { exception ->
                 Log.e(TAG, "Registro Fallido", exception)

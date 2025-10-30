@@ -1,20 +1,27 @@
 package com.example.aplicacionjetpack.data.dto
 
-import java.math.BigDecimal
-
-// Basado en tu CarritoItemController.java (asumiendo campos de CarritoItemRequest)
+// Basado en tu CarritoItemRequest.java
+// ¡Esta es la única definición que debe existir!
 data class CarritoItemRequest(
+    val idCarrito: Long,
     val idProducto: Long,
     val cantidad: Int
-    // Asumimos que el backend obtiene idCarrito/idUser del token
 )
 
-// Basado en tu CarritoItemController.java (asumiendo campos de CarritoItemResponse)
+// Basado en tu CarritoItemResponse.java
+// ¡Esta es la única definición que debe existir!
 data class CarritoItemResponse(
     val idCarritoItem: Long,
+    val idCarrito: Long,
     val idProducto: Long,
-    val nombreProducto: String,
-    val precioProducto: BigDecimal,
-    val cantidad: Int,
-    val imagenProducto: String?
+    val cantidad: Int?,
+    val producto: ProductResponse? // Anidado (Usa el ProductResponse.kt que ya tienes)
+)
+
+// Basado en tu CarritoResponse.java
+data class CarritoResponse(
+    val idCarrito: Long,
+    val idUser: Long,
+    val fechaCreacion: String?, // Usar String para GSON
+    val items: List<CarritoItemResponse>?
 )

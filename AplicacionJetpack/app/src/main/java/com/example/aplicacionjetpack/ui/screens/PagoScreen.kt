@@ -3,6 +3,7 @@ package com.example.aplicacionjetpack.ui.screens
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
@@ -10,18 +11,39 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.navigation.NavController
 import com.example.aplicacionjetpack.R
+import com.example.aplicacionjetpack.ui.viewmodel.CheckoutViewModel
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
-fun PagoScreen(navController: NavController) {
-    var numeroTarjeta by remember { mutableStateOf("") }
-    var fechaVencimiento by remember { mutableStateOf("") }
-    var cvv by remember { mutableStateOf("") }
-    var titularTarjeta by remember { mutableStateOf("") }
+fun PagoScreen(
+    navController: NavController,
+    // --- PARÁMETROS AÑADIDOS ---
+    idCarrito: Long,
+    viewModel: CheckoutViewModel
+) {
+    // Conecta el estado de la UI al ViewModel
+    val uiState = viewModel.uiState
+
+    // 1. Cuando la pantalla se carga, crea el pedido en estado PENDIENTE
+    LaunchedEffect(key1 = Unit) {
+        viewModel.createPendingOrder(idCarrito)
+    }
+
+    // 2. Observa si el pago fue exitoso para navegar
+    LaunchedEffect(key1 = uiState.checkoutSuccess) {
+        if (uiState.checkoutSuccess) {
+            navController.navigate("pago_finalizado") {
+                popUpTo("home") { inclusive = false } // Vuelve a Home
+                launchSingleTop = true
+            }
+        }
+    }
 
     Scaffold(
         topBar = {
@@ -67,8 +89,8 @@ fun PagoScreen(navController: NavController) {
                     modifier = Modifier.padding(bottom = 8.dp)
                 )
                 OutlinedTextField(
-                    value = numeroTarjeta,
-                    onValueChange = { numeroTarjeta = it },
+                    value = uiState.numeroTarjeta, // <- Conectado
+                    onValueChange = { viewModel.onNumeroTarjetaChange(it) }, // <- Conectado
                     modifier = Modifier.fillMaxWidth(),
                     placeholder = {
                         Text(
@@ -83,7 +105,9 @@ fun PagoScreen(navController: NavController) {
                         focusedContainerColor = Color.White,
                         unfocusedContainerColor = Color.White
                     ),
-                    shape = RoundedCornerShape(8.dp)
+                    shape = RoundedCornerShape(8.dp),
+                    keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
+                    isError = uiState.error != null
                 )
             }
 
@@ -104,8 +128,8 @@ fun PagoScreen(navController: NavController) {
                         modifier = Modifier.padding(bottom = 8.dp)
                     )
                     OutlinedTextField(
-                        value = fechaVencimiento,
-                        onValueChange = { fechaVencimiento = it },
+                        value = uiState.fechaVencimiento, // <- Conectado
+                        onValueChange = { viewModel.onFechaVencimientoChange(it) }, // <- Conectado
                         modifier = Modifier.fillMaxWidth(),
                         placeholder = {
                             Text(
@@ -120,7 +144,8 @@ fun PagoScreen(navController: NavController) {
                             focusedContainerColor = Color.White,
                             unfocusedContainerColor = Color.White
                         ),
-                        shape = RoundedCornerShape(8.dp)
+                        shape = RoundedCornerShape(8.dp),
+                        isError = uiState.error != null
                     )
                 }
 
@@ -136,8 +161,8 @@ fun PagoScreen(navController: NavController) {
                         modifier = Modifier.padding(bottom = 8.dp)
                     )
                     OutlinedTextField(
-                        value = cvv,
-                        onValueChange = { cvv = it },
+                        value = uiState.cvv, // <- Conectado
+                        onValueChange = { viewModel.onCvvChange(it) }, // <- Conectado
                         modifier = Modifier.fillMaxWidth(),
                         placeholder = {
                             Text(
@@ -152,7 +177,9 @@ fun PagoScreen(navController: NavController) {
                             focusedContainerColor = Color.White,
                             unfocusedContainerColor = Color.White
                         ),
-                        shape = RoundedCornerShape(8.dp)
+                        shape = RoundedCornerShape(8.dp),
+                        keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
+                        isError = uiState.error != null
                     )
                 }
             }
@@ -167,8 +194,8 @@ fun PagoScreen(navController: NavController) {
                     modifier = Modifier.padding(bottom = 8.dp)
                 )
                 OutlinedTextField(
-                    value = titularTarjeta,
-                    onValueChange = { titularTarjeta = it },
+                    value = uiState.titular, // <- Conectado
+                    onValueChange = { viewModel.onTitularChange(it) }, // <- Conectado
                     modifier = Modifier.fillMaxWidth(),
                     placeholder = {
                         Text(
@@ -183,7 +210,17 @@ fun PagoScreen(navController: NavController) {
                         focusedContainerColor = Color.White,
                         unfocusedContainerColor = Color.White
                     ),
-                    shape = RoundedCornerShape(8.dp)
+                    shape = RoundedCornerShape(8.dp),
+                    isError = uiState.error != null
+                )
+            }
+
+            // Muestra el error
+            if (uiState.error != null) {
+                Text(
+                    text = uiState.error,
+                    color = MaterialTheme.colorScheme.error,
+                    modifier = Modifier.fillMaxWidth()
                 )
             }
 
@@ -209,7 +246,7 @@ fun PagoScreen(navController: NavController) {
                     modifier = Modifier.padding(bottom = 4.dp)
                 )
                 Text(
-                    text = "$0.00",
+                    text = "$0.00", // TODO: Obtener total real del CarritoViewModel
                     fontSize = 24.sp,
                     color = Color(0xFF2D1B4E),
                     fontWeight = FontWeight.Bold
@@ -221,12 +258,12 @@ fun PagoScreen(navController: NavController) {
             // Botón PAGAR
             Button(
                 onClick = {
-                    // Navegar a la pantalla de pago finalizado
-                    navController.navigate("pago_finalizado") {
-                        popUpTo("pago") { inclusive = true }
-                        launchSingleTop = true
-                    }
+                    // 3. Llama al paso final de pago
+                    viewModel.processPayment()
                 },
+                enabled = viewModel.isPaymentValid &&
+                        uiState.idPedidoPendiente != null &&
+                        !uiState.isLoading,
                 modifier = Modifier
                     .fillMaxWidth()
                     .height(48.dp),
@@ -235,12 +272,20 @@ fun PagoScreen(navController: NavController) {
                 ),
                 shape = RoundedCornerShape(8.dp)
             ) {
-                Text(
-                    text = "PAGAR",
-                    color = Color.White,
-                    fontSize = 16.sp,
-                    fontWeight = FontWeight.Bold
-                )
+                if (uiState.isLoading) {
+                    CircularProgressIndicator(
+                        modifier = Modifier.size(24.dp),
+                        color = Color.White,
+                        strokeWidth = 3.dp
+                    )
+                } else {
+                    Text(
+                        text = "PAGAR",
+                        color = Color.White,
+                        fontSize = 16.sp,
+                        fontWeight = FontWeight.Bold
+                    )
+                }
             }
         }
     }

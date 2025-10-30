@@ -1,10 +1,9 @@
-package com.example.aplicacionjetpack.data // <-- ¡ESTO ESTÁ BIEN!
+package com.example.aplicacionjetpack.data
 
+// --- 👇👇👇 ¡LA CORRECCIÓN DEFINITIVA! 👇👇👇 ---
+// Cambia "data object" a un simple "object". Kapt sí entiende esto.
 object AuthManager {
     var authToken: String? = null
-
-    // ¡ASEGÚRATE DE QUE ESTA LÍNEA ESTÉ DESCOMENTADA!
     var userId: Long? = null
-
-    // var userRoles: List<String>? = null
+    // var userRoles: List<String>? = null // Mantenlo comentado por ahora
 }

@@ -1,4 +1,5 @@
-package com.example.aplicacionjetpack.data.remote
+// Ruta: app/src/main/java/com/example/aplicacionjetpack/data/api/ProductApi.kt
+package com.example.aplicacionjetpack.data.api
 
 import com.example.aplicacionjetpack.data.dto.PagedResponse
 import com.example.aplicacionjetpack.data.dto.ProductResponse
@@ -8,18 +9,15 @@ import retrofit2.http.Query
 
 interface ProductApi {
 
-    // Para HomeScreen y BusquedaScreen
+    // --- 👇👇👇 ¡¡¡LA CORRECCIÓN DEFINITIVA ESTÁ AQUÍ!!! 👇👇👇 ---
+    // La ruta correcta es "/all", no "/all/paginated"
     @GET("auth/producto/all")
+    // --- ----------------------------------------------------- ---
     suspend fun getAllProducts(
         @Query("page") page: Int,
         @Query("size") size: Int
-        // NOTA: Tu backend no tiene un @Query("search").
-        // La búsqueda se hará en el cliente (ViewModel).
     ): PagedResponse<ProductResponse>
 
-    // Para ProductDetailScreen
     @GET("auth/producto/{id}")
     suspend fun getProductById(@Path("id") id: Long): ProductResponse
-
-    // TODO: Añadir /recomendados si lo necesitas
 }

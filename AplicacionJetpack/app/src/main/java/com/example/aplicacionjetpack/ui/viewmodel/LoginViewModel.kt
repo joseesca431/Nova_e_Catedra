@@ -1,6 +1,6 @@
 package com.example.aplicacionjetpack.ui.viewmodel
 
-import android.util.Base64 // Importado
+import android.util.Base64
 import android.util.Log
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
@@ -12,14 +12,13 @@ import com.example.aplicacionjetpack.data.TokenManager
 import com.example.aplicacionjetpack.data.repository.AuthRepository
 import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.launch
-import org.json.JSONObject // Importado
-import java.nio.charset.Charset // Importado
+import org.json.JSONObject
+import java.nio.charset.Charset
 import javax.inject.Inject
 import kotlin.Result
 
-// Estado de la UI para LoginScreen
 data class LoginUiState(
-    val username: String = "", // El backend usa 'username'
+    val username: String = "",
     val password: String = "",
     val isLoading: Boolean = false,
     val loginSuccess: Boolean = false,
@@ -36,7 +35,7 @@ class LoginViewModel @Inject constructor(
         private set
     private val TAG = "LoginVM"
 
-    fun onUsernameChange(username: String) { // Renombrado de onEmailChange
+    fun onUsernameChange(username: String) {
         uiState = uiState.copy(username = username, error = null)
     }
 
@@ -55,39 +54,39 @@ class LoginViewModel @Inject constructor(
             val result: Result<String> = authRepository.login(usernameLimpio, passwordLimpio)
 
             result.onSuccess { token ->
-                if (token.isNullOrBlank()) {
+                if (token.isBlank()) {
                     Log.e(TAG, "Login exitoso pero token vacío")
                     uiState = uiState.copy(isLoading = false, error = "Token inválido recibido.")
                     return@onSuccess
                 }
 
-                // Normalizar: almacena el JWT sin prefijo "Bearer "
                 val jwt = if (token.startsWith("Bearer ", ignoreCase = true)) {
                     token.removePrefix("Bearer ").trim()
                 } else token.trim()
 
-                // 1. Guarda en TokenManager (SharedPreferences)
+                // 1. Guardar en TokenManager (SharedPreferences)
                 tokenManager.saveToken(jwt)
 
-                // 2. Decodifica el token para obtener el userId
+                // 2. Decodificar el token para obtener el userId
                 val userId = getUserIdFromJwt(jwt)
 
-                // 3. Guarda AMBOS en AuthManager (en memoria)
-                try {
-                    AuthManager.authToken = jwt
-                    AuthManager.userId = userId // <-- ¡ARREGLO APLICADO AQUÍ!
-                } catch (ex: Throwable) {
-                    // Si AuthManager no existe o falla, ignoramos
-                    Log.d(TAG, "AuthManager no disponible o fallo al asignar: ${ex.message}")
+                // --- 👇👇👇 ¡LA CORRECCIÓN DEFINITIVA ESTÁ AQUÍ! 👇👇👇 ---
+                if (userId == null) {
+                    Log.e(TAG, "¡Login exitoso pero no se pudo extraer userId del token JWT!")
+                    uiState = uiState.copy(isLoading = false, error = "Error al procesar los datos de usuario.")
+                    // Limpiamos el token guardado para evitar un estado inconsistente
+                    tokenManager.clearToken()
+                    return@onSuccess // ¡NO CONTINUAR SI NO TENEMOS userId!
                 }
 
-                if(userId == null) {
-                    Log.e(TAG, "¡Login exitoso pero no se pudo extraer userId del token JWT!")
-                    // Opcional: podrías querer mostrar un error al usuario si esto falla
-                }
+                // 3. Guardar AMBOS en AuthManager (en memoria)
+                // Ahora estamos seguros de que userId no es nulo.
+                AuthManager.authToken = jwt
+                AuthManager.userId = userId
 
                 Log.d(TAG, "Login Exitoso en VM. Token guardado. UserId=$userId.")
                 uiState = uiState.copy(isLoading = false, loginSuccess = true)
+                // --- -------------------------------------------------------- ---
 
             }.onFailure { exception ->
                 Log.e(TAG, "Login Fallido en VM", exception)
@@ -96,30 +95,22 @@ class LoginViewModel @Inject constructor(
         }
     }
 
-    /**
-     * Decodifica el payload de un token JWT para extraer el ID de usuario.
-     * Busca los 'claims' (llaves) "userId" o "sub".
-     */
     private fun getUserIdFromJwt(token: String): Long? {
         try {
             val parts = token.split(".")
             if (parts.size < 2) {
-                Log.e(TAG, "Token JWT inválido, no tiene 3 partes.")
-                return null // Token inválido
+                Log.e(TAG, "Token JWT inválido, no tiene payload.")
+                return null
             }
 
-            // Obtenemos el payload (la parte del medio)
             val payload = parts[1]
             val decodedBytes = Base64.decode(payload, Base64.URL_SAFE)
             val decodedJson = String(decodedBytes, Charset.defaultCharset())
-
             val json = JSONObject(decodedJson)
 
-            // El backend puede usar "userId", "sub" (estándar), "id", etc.
-            // Priorizamos "userId", luego "sub".
             return when {
                 json.has("userId") -> json.getLong("userId")
-                json.has("sub") -> json.getString("sub").toLongOrNull() // 'sub' a veces es String
+                json.has("sub") -> json.getString("sub").toLongOrNull()
                 else -> {
                     Log.e(TAG, "No se encontró 'userId' o 'sub' en el payload del JWT.")
                     null
@@ -130,7 +121,4 @@ class LoginViewModel @Inject constructor(
             return null
         }
     }
-
-    // fun onGoogleLoginClicked() { /* TODO */ }
-    // fun onFacebookLoginClicked() { /* TODO */ }
 }

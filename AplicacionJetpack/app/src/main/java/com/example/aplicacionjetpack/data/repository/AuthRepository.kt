@@ -1,6 +1,7 @@
 package com.example.aplicacionjetpack.data.repository
 
 import com.example.aplicacionjetpack.data.dto.RegisterRequest
+
 import kotlin.Result // Asegúrate de importar kotlin.Result
 
 // Interfaz que usa el ViewModel
