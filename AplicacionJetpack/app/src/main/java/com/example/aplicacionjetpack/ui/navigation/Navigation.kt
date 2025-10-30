@@ -1,7 +1,6 @@
 package com.example.aplicacionjetpack.ui.navigation
 
 import androidx.compose.runtime.Composable
-import androidx.compose.runtime.LaunchedEffect
 import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.navigation.NavType
 import androidx.navigation.compose.NavHost
@@ -9,27 +8,14 @@ import androidx.navigation.compose.composable
 import androidx.navigation.compose.rememberNavController
 import androidx.navigation.navArgument
 // --- Importa TODOS tus Screens ---
-import com.example.aplicacionjetpack.ui.screens.BusquedaScreen
-import com.example.aplicacionjetpack.ui.screens.CarritoScreen
-import com.example.aplicacionjetpack.ui.screens.ConfirmAddressScreen
-import com.example.aplicacionjetpack.ui.screens.DetallesPagoScreen
-import com.example.aplicacionjetpack.ui.screens.HomeScreen
-import com.example.aplicacionjetpack.ui.screens.LoginScreen
-import com.example.aplicacionjetpack.ui.screens.PagoFinalizadoScreen
-import com.example.aplicacionjetpack.ui.screens.PagoScreen
-import com.example.aplicacionjetpack.ui.screens.ProfileScreen
-import com.example.aplicacionjetpack.ui.screens.RegisterScreen
-import com.example.aplicacionjetpack.ui.screens.SplashScreen
-import com.example.aplicacionjetpack.ui.screens.ProductDetailScreen
+import com.example.aplicacionjetpack.ui.screens.* // Importa todos
 // --- Importa TODOS tus ViewModels ---
 import com.example.aplicacionjetpack.ui.viewmodel.LoginViewModel
 import com.example.aplicacionjetpack.ui.viewmodel.RegisterViewModel
-// (Asegúrate de tener también los ViewModels para las otras pantallas: Home, Product, Cart, etc.)
-// import com.example.aplicacionjetpack.ui.viewmodel.HomeViewModel
-// import com.example.aplicacionjetpack.ui.viewmodel.ProductListViewModel
+import com.example.aplicacionjetpack.ui.viewmodel.HomeViewModel
+import com.example.aplicacionjetpack.ui.viewmodel.SearchViewModel
+// Si en algún punto necesitas referenciar ProductDetailViewModel aquí, puedes importarlo:
 // import com.example.aplicacionjetpack.ui.viewmodel.ProductDetailViewModel
-// import com.example.aplicacionjetpack.ui.viewmodel.OrderDetailViewModel
-// import com.example.aplicacionjetpack.ui.viewmodel.CartViewModel
 
 @Composable
 fun AppNavigation() {
@@ -46,10 +32,9 @@ fun AppNavigation() {
         // --- PANTALLA LOGIN ---
         composable("login") {
             val viewModel: LoginViewModel = hiltViewModel()
-            val uiState = viewModel.uiState
             LoginScreen(
                 navController = navController,
-                uiState = uiState,
+                uiState = viewModel.uiState,
                 onUsernameChange = viewModel::onUsernameChange,
                 onPasswordChange = viewModel::onPasswordChange,
                 onLoginClick = viewModel::onLoginClicked
@@ -59,13 +44,12 @@ fun AppNavigation() {
         // --- PANTALLA REGISTRO ---
         composable("register") {
             val viewModel: RegisterViewModel = hiltViewModel()
-            val uiState = viewModel.uiState
             RegisterScreen(
                 navController = navController,
-                uiState = uiState,
+                uiState = viewModel.uiState,
                 onPrimerNombreChange = viewModel::onPrimerNombreChange,
                 onPrimerApellidoChange = viewModel::onPrimerApellidoChange,
-                onFechaNacimientoClicked = viewModel::onFechaNacimientoClicked, // Para el calendario
+                onFechaNacimientoClicked = viewModel::onFechaNacimientoClicked,
                 onCalendarDismiss = viewModel::onCalendarDismiss,
                 onDateSelected = viewModel::onDateSelected,
                 onEmailChange = viewModel::onEmailChange,
@@ -81,63 +65,82 @@ fun AppNavigation() {
             )
         }
 
-        // --- PANTALLAS DE CLIENTE (Aún no refactorizadas, excepto DetallesPago) ---
-        // (Eventualmente, todas estas deberían inyectar su propio ViewModel)
-
-        composable("home"){
-            // TODO: Refactorizar HomeScreen con HomeViewModel
-            HomeScreen(navController = navController)
+        // --- PANTALLA HOME (CORREGIDA) ---
+        composable("home") {
+            val viewModel: HomeViewModel = hiltViewModel()
+            HomeScreen(
+                navController = navController,
+                uiState = viewModel.uiState,
+                onRefresh = viewModel::refreshProducts,
+                onProductClick = { product ->
+                    // Navega al detalle pasando el ID real
+                    navController.navigate("product_detail/${product.idProducto}")
+                },
+                onSearchClick = {
+                    navController.navigate("busqueda")
+                }
+            )
         }
+
+        // --- PANTALLA BÚSQUEDA (CORREGIDA) ---
+        composable("busqueda") {
+            val viewModel: SearchViewModel = hiltViewModel()
+            BusquedaScreen(
+                navController = navController,
+                uiState = viewModel.uiState,
+                onQueryChange = viewModel::onSearchQueryChange,
+                onProductClick = { product ->
+                    navController.navigate("product_detail/${product.idProducto}")
+                }
+            )
+        }
+
+        // --- PANTALLA DETALLE PRODUCTO (RUTA ACTUALIZADA, ARREGLADA) ---
+        composable(
+            route = "product_detail/{productId}",
+            arguments = listOf(navArgument("productId") { type = NavType.LongType })
+        ) { backStackEntry ->
+            // Extrae el productId de los argumentos (si no viene, queda 0L)
+            val productId = backStackEntry.arguments?.getLong("productId") ?: 0L
+
+            /*
+             * Nota:
+             * - Tu ProductDetailScreen, tal como te entregué, tiene la firma:
+             *   ProductDetailScreen(navController: NavController, productId: Long, viewModel: ProductDetailViewModel = hiltViewModel())
+             *
+             * - Por eso aquí basta con pasar navController y productId. El screen pedirá su ViewModel con hiltViewModel().
+             *
+             * Si en tu proyecto prefieres manejar el ViewModel desde aquí y pasarlo al Screen,
+             * descomenta la siguiente línea y pásalo:
+             *
+             * val detailVm: ProductDetailViewModel = hiltViewModel()
+             * ProductDetailScreen(navController = navController, productId = productId, viewModel = detailVm)
+             */
+
+            ProductDetailScreen(
+                navController = navController,
+                productId = productId
+            )
+        }
+
+        // --- OTRAS PANTALLAS (Aún no refactorizadas) ---
         composable("profile") {
-            // TODO: Refactorizar ProfileScreen con ProfileViewModel
             ProfileScreen(navController = navController)
         }
-        composable("cart"){
-            // TODO: Refactorizar CarritoScreen con CartViewModel
+        composable("cart") {
             CarritoScreen(navController = navController)
         }
-        composable("product_detail"){
-            // TODO: Refactorizar ProductDetailScreen con ProductDetailViewModel
-            ProductDetailScreen(navController = navController)
-        }
         composable("confirm_address") {
-            // TODO: Refactorizar ConfirmAddressScreen con AddressViewModel
             ConfirmAddressScreen(navController = navController)
         }
-
-        // --- PANTALLA DETALLES DE PAGO (CORREGIDA) ---
-        composable(
-            route = "detalles_pago", // O "detalles_pago/{pedidoId}" si necesitas pasar un ID
-            // arguments = listOf(navArgument("pedidoId") { type = NavType.LongType })
-        ) { backStackEntry ->
-            // --- 👇 CORRECCIÓN AQUÍ 👇 ---
-            // Inyecta el ViewModel
-            // val viewModel: OrderDetailViewModel = hiltViewModel() // Necesitarás este VM
-            // val uiState = viewModel.uiState
-
-            // Llama a DetallesPagoScreen pasándole el viewModel
-            DetallesPagoScreen(
-                navController = navController
-                // uiState = uiState,       // 👈 Pasa el estado
-                // viewModel = viewModel    // 👈 Pasa el ViewModel completo
-            )
-            // --- FIN CORRECCIÓN ---
+        composable("detalles_pago") {
+            DetallesPagoScreen(navController = navController)
         }
-        // ------------------------------------
-
         composable("pago") {
             PagoScreen(navController = navController)
         }
-        composable("pago_finalizado"){
+        composable("pago_finalizado") {
             PagoFinalizadoScreen(navController = navController)
         }
-        composable("busqueda") {
-            BusquedaScreen(navController = navController)
-        }
-
-        // --- RUTA "START" (ELIMINADA) ---
-        // composable("start"){
-        //     SessionStartScreen(navController = navController)
-        // }
     }
 }

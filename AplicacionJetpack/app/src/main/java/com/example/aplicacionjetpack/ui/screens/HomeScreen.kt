@@ -12,101 +12,109 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Search
 import androidx.compose.material3.*
 import androidx.compose.runtime.Composable
-import androidx.compose.runtime.mutableStateOf
-import androidx.compose.runtime.remember
-import androidx.compose.runtime.getValue
-import androidx.compose.runtime.setValue
+import androidx.compose.runtime.mutableStateOf // Necesario para selectedTab
+import androidx.compose.runtime.remember // Necesario para selectedTab
+import androidx.compose.runtime.getValue // Necesario para selectedTab
+import androidx.compose.runtime.setValue // Necesario para selectedTab
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.layout.ContentScale // Para Coil
+import androidx.compose.ui.platform.LocalContext // Para Coil
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.TextAlign // Importar
+import androidx.compose.ui.text.style.TextOverflow // Para nombres largos
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.navigation.NavController
+import coil.compose.AsyncImage // <-- Importar Coil
+import coil.request.ImageRequest // <-- Importar Coil
 import com.example.aplicacionjetpack.R
-import com.example.aplicacionjetpack.model.Product
+// Importa el DTO real, no el modelo simulado
+import com.example.aplicacionjetpack.data.dto.ProductResponse
+import com.example.aplicacionjetpack.ui.viewmodel.HomeUiState // Importar UiState
+import com.google.accompanist.swiperefresh.SwipeRefresh // Para Pull-to-refresh
+import com.google.accompanist.swiperefresh.rememberSwipeRefreshState // Para Pull-to-refresh
 
-// Colores personalizados (basados en las vistas previas)
+
+// Colores (puedes moverlos a ui/theme/Color.kt)
 val PurpleDark = Color(0xFF2D1B4E)
 val OrangeAccent = Color(0xFFFF6B35)
 
-
-// Lista de productos de muestra (asume R.drawable.ic_product_placeholder existe)
-val sampleProducts = List(2) {
-    Product(
-        name = "Lampara de Brook One Piece",
-        price = "$40.00",
-        // Aquí usa una imagen placeholder que definas en tu carpeta 'drawable'
-        imageResId = R.drawable.ic_producto
-    )
-}
+// Ya no necesitas 'sampleProducts' ni 'data class Product'
 
 @Composable
-fun ProductCard(product: Product, navController: NavController) {
+fun ProductCard(
+    product: ProductResponse, // <-- Acepta el DTO real
+    onClick: () -> Unit // <-- Evento click
+) {
     Column(
         modifier = Modifier
             .fillMaxWidth()
             .padding(4.dp)
-            .clip(RoundedCornerShape(8.dp)) // Agrega esto antes del clickable
+            .clip(RoundedCornerShape(8.dp))
             .background(Color.White)
-            .clickable {
-                // Navegar al detalle del producto
-                try {
-                    navController.navigate("product_detail")
-                } catch (e: Exception) {
-                    // Manejo de error por si acaso
-                    e.printStackTrace()
-                }
-            }
-            .padding(4.dp) // Padding interno después del background
+            .clickable(onClick = onClick) // Llama al evento
+            .padding(4.dp)
     ) {
-        // Espacio para la Imagen
+        // Espacio para la Imagen (con Coil)
         Box(
             modifier = Modifier
                 .fillMaxWidth()
-                .aspectRatio(1f)
+                .aspectRatio(1f) // Mantiene la proporción cuadrada
                 .background(Color(0xFFEFEFEF)),
             contentAlignment = Alignment.Center
         ) {
-            Image(
-                painter = painterResource(id = R.drawable.ic_producto),
-                contentDescription = product.name,
-                modifier = Modifier
-                    .fillMaxSize(0.8f)
-                    .clip(RoundedCornerShape(8.dp))
+            AsyncImage(
+                model = ImageRequest.Builder(LocalContext.current)
+                    .data(product.imagen) // <-- Usa la URL de la API
+                    .crossfade(true)
+                    .placeholder(R.drawable.ic_producto) // Placeholder
+                    .error(R.drawable.ic_producto) // Imagen de error
+                    .build(),
+                contentDescription = product.nombre,
+                modifier = Modifier.fillMaxSize().clip(RoundedCornerShape(8.dp)),
+                contentScale = ContentScale.Crop // Escala la imagen
             )
         }
 
         // Nombre del Producto
         Text(
-            text = product.name,
+            text = product.nombre, // <-- Usa dato real
             fontSize = 14.sp,
             color = Color.Black,
             fontWeight = FontWeight.Normal,
-            modifier = Modifier.padding(start = 8.dp, top = 8.dp, end = 8.dp)
+            modifier = Modifier.padding(start = 8.dp, top = 8.dp, end = 8.dp),
+            maxLines = 2, // Limita el nombre a 2 líneas
+            overflow = TextOverflow.Ellipsis // Añade "..." si es muy largo
         )
 
         // Precio del Producto
         Text(
-            text = product.price,
+            text = "$${"%.2f".format(product.precio)}", // <-- Usa y formatea dato real
             fontSize = 16.sp,
             color = PurpleDark,
             fontWeight = FontWeight.Bold,
-            modifier = Modifier.padding(start = 8.dp, bottom = 8.dp)
+            modifier = Modifier.padding(start = 8.dp, bottom = 8.dp, top = 4.dp)
         )
     }
 }
 
-// Y actualiza también la función HomeScreen para pasar el navController:
-
+// HomeScreen AHORA ACEPTA UiState y Eventos
 @Composable
-fun HomeScreen(navController: NavController) {
+fun HomeScreen(
+    navController: NavController,
+    uiState: HomeUiState, // <-- Recibe el UiState
+    onRefresh: () -> Unit, // <-- Recibe evento de refresh
+    onProductClick: (ProductResponse) -> Unit, // <-- Recibe evento de click
+    onSearchClick: () -> Unit // <-- Recibe evento de click en búsqueda
+) {
     var selectedTab by remember { mutableStateOf("Home") }
 
     Scaffold(
-        topBar = { HomeTopBar(navController) },
+        topBar = { HomeTopBar(onSearchClick = onSearchClick) }, // Pasa el evento
         bottomBar = {
             HomeBottomBar(
                 selectedTab = selectedTab,
@@ -115,89 +123,105 @@ fun HomeScreen(navController: NavController) {
             )
         }
     ) { paddingValues ->
-        LazyVerticalGrid(
-            columns = GridCells.Fixed(2),
-            modifier = Modifier
-                .fillMaxSize()
-                .padding(paddingValues)
-                .background(Color(0xFFF5F5F5)),
-            contentPadding = PaddingValues(4.dp),
-            verticalArrangement = Arrangement.spacedBy(4.dp),
-            horizontalArrangement = Arrangement.spacedBy(4.dp)
+        // Contenedor para Pull-to-refresh y manejo de estados
+        val swipeRefreshState = rememberSwipeRefreshState(
+            isRefreshing = uiState.isLoading && uiState.products.isNotEmpty() // Muestra refresh solo si ya hay items
+        )
+        SwipeRefresh(
+            state = swipeRefreshState,
+            onRefresh = onRefresh, // Llama al ViewModel
+            modifier = Modifier.fillMaxSize().padding(paddingValues)
         ) {
-            items(sampleProducts) { product ->
-                ProductCard(
-                    product = product,
-                    navController = navController // Pasa el navController aquí
-                )
-            }
-        }
-    }
+            Box(
+                modifier = Modifier
+                    .fillMaxSize()
+                    .background(Color(0xFFF5F5F5))
+            ) {
+                if (uiState.isLoading && uiState.products.isEmpty()) {
+                    // Carga inicial
+                    CircularProgressIndicator(modifier = Modifier.align(Alignment.Center))
+                } else if (uiState.error != null) {
+                    // Error
+                    Text(
+                        text = uiState.error,
+                        color = Color.Red,
+                        modifier = Modifier.align(Alignment.Center).padding(16.dp),
+                        textAlign = TextAlign.Center
+                    )
+                } else if (uiState.products.isEmpty() && !uiState.isLoading) {
+                    // Lista vacía
+                    Text(
+                        text = "No se encontraron productos.",
+                        color = Color.Gray,
+                        modifier = Modifier.align(Alignment.Center).padding(16.dp),
+                        textAlign = TextAlign.Center
+                    )
+                } else {
+                    // Contenido: Grilla de Productos
+                    LazyVerticalGrid(
+                        columns = GridCells.Fixed(2),
+                        modifier = Modifier.fillMaxSize(),
+                        contentPadding = PaddingValues(4.dp),
+                        verticalArrangement = Arrangement.spacedBy(4.dp),
+                        horizontalArrangement = Arrangement.spacedBy(4.dp)
+                    ) {
+                        items(uiState.products, key = { it.idProducto }) { product ->
+                            ProductCard(
+                                product = product,
+                                onClick = { onProductClick(product) } // Llama al evento
+                            )
+                        }
+                        // TODO: Añadir item al final para paginación (cargar más)
+                    }
+                }
+            } // Fin Box
+        } // Fin SwipeRefresh
+    } // Fin Scaffold
 }
 
 @Composable
-fun HomeTopBar(navController: NavController) {
-    // Definimos el color naranja y púrpura para usarlo de manera consistente
-
+fun HomeTopBar(onSearchClick: () -> Unit) { // <-- Acepta evento
     Row(
-        // Modificador clave para posicionarse debajo de la barra de estado
         modifier = Modifier
             .fillMaxWidth()
             .background(Color.White)
             .padding(WindowInsets.statusBars.asPaddingValues())
-            .height(56.dp) // Altura estándar para una App Bar
-            .padding(horizontal = 16.dp), // Espaciado a los lados
+            .height(56.dp)
+            .padding(horizontal = 16.dp),
         verticalAlignment = Alignment.CenterVertically
     ) {
-        // Logo NOVA+e (Izquierda)
         Image(
             painter = painterResource(id = R.drawable.novainicio),
             contentDescription = "Logo NOVA+e",
-            modifier = Modifier
-                .width(90.dp)
-                .height(40.dp)
+            modifier = Modifier.width(90.dp).height(40.dp)
         )
-
-        Spacer(modifier = Modifier.weight(1f)) // Empuja el siguiente elemento a la derecha
-
-        // Botón/Ícono de Búsqueda (Derecha)
+        Spacer(modifier = Modifier.weight(1f))
         Button(
-            onClick = { navController.navigate("busqueda") }, // Cambia esta línea
+            onClick = onSearchClick, // <-- Llama al evento
             modifier = Modifier.size(48.dp),
-            colors = ButtonDefaults.buttonColors(
-                containerColor = OrangeAccent
-            ),
+            colors = ButtonDefaults.buttonColors(containerColor = OrangeAccent),
             contentPadding = PaddingValues(0.dp),
             shape = RoundedCornerShape(10.dp)
         ) {
-            Icon(
-                Icons.Default.Search,
-                contentDescription = "Buscar",
-                tint = Color.White,
-                modifier = Modifier.size(24.dp)
-            )
+            Icon(Icons.Default.Search, "Buscar", tint = Color.White, modifier = Modifier.size(24.dp))
         }
     }
 }
 
+// --- BottomBar (sin cambios) ---
 data class BottomNavItem(val label: String, val iconResId: Int, val route: String)
-
 val bottomNavItems = listOf(
     BottomNavItem("Home", R.drawable.ic_home, "home"),
     BottomNavItem("Perfil", R.drawable.ic_perfil, "profile"),
     BottomNavItem("Carrito", R.drawable.ic_carrito, "cart")
 )
-
 @Composable
-fun HomeBottomBar(navController: NavController,
-                  selectedTab: String,
-                  onTabSelected: (String) -> Unit) {
+fun HomeBottomBar(navController: NavController, selectedTab: String, onTabSelected: (String) -> Unit) {
     NavigationBar(
         containerColor = Color.White,
     ) {
         bottomNavItems.forEach { item ->
             val isSelected = selectedTab == item.label
-            // Usamos el color principal de tu app para el ícono y texto seleccionado
             val activeColor = PurpleDark
             val inactiveColor = Color.Gray
 
@@ -225,9 +249,8 @@ fun HomeBottomBar(navController: NavController,
                         color = if (isSelected) activeColor else inactiveColor
                     )
                 },
-                // El indicador se mantiene simple (o transparente) para no oscurecer el diseño
                 colors = NavigationBarItemDefaults.colors(
-                    indicatorColor = Color.White, // Fondo limpio
+                    indicatorColor = Color.White,
                     selectedIconColor = activeColor,
                     unselectedIconColor = inactiveColor
                 )
