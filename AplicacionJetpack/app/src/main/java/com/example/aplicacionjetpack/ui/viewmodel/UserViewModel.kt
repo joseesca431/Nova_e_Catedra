@@ -9,15 +9,22 @@ import com.example.aplicacionjetpack.data.AuthManager
 import com.example.aplicacionjetpack.data.dto.UserResponse
 import com.example.aplicacionjetpack.data.repository.UserRepository
 import dagger.hilt.android.lifecycle.HiltViewModel
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 import javax.inject.Inject
 
-// --- ESTADO PARA LA PANTALLA DE EDICIÓN ---
+// --- ESTADO PARA LA PANTALLA DE EDICIÓN (ahora con campos de contraseña) ---
 data class UserUiState(
     val user: UserResponse? = null,
     val username: String = "",
     val email: String = "",
     val telefono: String = "",
+
+    // Campos para manejo de contraseñas en la UI
+    val newPassword: String = "",
+    val confirmNewPassword: String = "",
+    val currentPassword: String = "",
+
     val isLoading: Boolean = true,
     val isUpdating: Boolean = false,
     val updateSuccess: Boolean = false,
@@ -44,12 +51,10 @@ class UserViewModel @Inject constructor(
 
         viewModelScope.launch {
             uiState = uiState.copy(isLoading = true)
-            // Llamamos a la función correcta que ya definimos
             userRepository.getUserProfile(userId).onSuccess { user ->
                 uiState = uiState.copy(
                     isLoading = false,
                     user = user,
-                    // Poblamos los campos de edición con los datos actuales
                     username = user.username,
                     email = user.email,
                     telefono = user.telefono ?: ""
@@ -60,7 +65,7 @@ class UserViewModel @Inject constructor(
         }
     }
 
-    // --- EVENTOS DE CAMBIO ---
+    // --- EVENTOS DE CAMBIO (incluye contraseñas) ---
     fun onUsernameChanged(newUsername: String) {
         uiState = uiState.copy(username = newUsername, error = null)
     }
@@ -73,18 +78,71 @@ class UserViewModel @Inject constructor(
         uiState = uiState.copy(telefono = newTelefono, error = null)
     }
 
+    fun onNewPasswordChanged(value: String) {
+        uiState = uiState.copy(newPassword = value, error = null)
+    }
+
+    fun onConfirmNewPasswordChanged(value: String) {
+        uiState = uiState.copy(confirmNewPassword = value, error = null)
+    }
+
+    fun onCurrentPasswordChanged(value: String) {
+        uiState = uiState.copy(currentPassword = value, error = null)
+    }
+
     // --- LÓGICA DE ACTUALIZACIÓN ---
     fun updateProfile() {
-        // TODO: Implementar la llamada real al backend para actualizar.
-        // Por ahora, simulamos un éxito para probar la navegación de vuelta.
+        // Validaciones UI básicas
+        if (uiState.currentPassword.isBlank()) {
+            uiState = uiState.copy(error = "Introduce tu contraseña actual para confirmar los cambios.")
+            return
+        }
+
+        if (uiState.newPassword.isNotBlank()) {
+            if (uiState.newPassword != uiState.confirmNewPassword) {
+                uiState = uiState.copy(error = "La nueva contraseña y su confirmación no coinciden.")
+                return
+            }
+            if (uiState.newPassword.length < 6) {
+                uiState = uiState.copy(error = "La contraseña debe tener al menos 6 caracteres.")
+                return
+            }
+        }
+
+        val userId = AuthManager.userId
+        if (userId == null) {
+            uiState = uiState.copy(error = "Usuario no autenticado.")
+            return
+        }
+
         viewModelScope.launch {
-            uiState = uiState.copy(isUpdating = true)
-            // Aquí iría la llamada real al repositorio:
-            // val result = userRepository.updateProfile(userId, request)
-            // result.onSuccess { ... }
-            // Como no tenemos el endpoint, simulamos que funciona.
-            kotlinx.coroutines.delay(1000) // Simula una llamada de red
-            uiState = uiState.copy(isUpdating = false, updateSuccess = true)
+            uiState = uiState.copy(isUpdating = true, error = null)
+
+            try {
+                // ----- AQUÍ puedes llamar a tu repositorio para actualizar realmente -----
+                // Ejemplo (si tienes un DTO UpdateUserRequest):
+                // val request = UpdateUserRequest(
+                //     username = uiState.username,
+                //     email = uiState.email,
+                //     telefono = uiState.telefono,
+                //     currentPassword = uiState.currentPassword,
+                //     newPassword = if (uiState.newPassword.isBlank()) null else uiState.newPassword
+                // )
+                // val result = userRepository.updateProfile(userId, request)
+                // result.onSuccess { ... }.onFailure { ... }
+
+                // Como no conocemos tu endpoint exacto, simulamos la llamada:
+                delay(900)
+
+                // Si usas la API real, reemplaza lo anterior por la llamada a userRepository
+                // y maneja onSuccess/onFailure según tu API.
+
+                // Simulamos éxito:
+                uiState = uiState.copy(isUpdating = false, updateSuccess = true, error = null)
+
+            } catch (e: Exception) {
+                uiState = uiState.copy(isUpdating = false, error = "Error al actualizar el perfil.")
+            }
         }
     }
 }
