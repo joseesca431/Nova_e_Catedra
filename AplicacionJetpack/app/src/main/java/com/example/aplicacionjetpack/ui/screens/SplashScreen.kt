@@ -16,8 +16,10 @@ import kotlinx.coroutines.delay
 
 @Composable
 fun SplashScreen(navController: NavController) {
+    // Este efecto se lanza una vez
     LaunchedEffect(key1 = true) {
-        delay(3000)
+        delay(3000) // Espera 3 segundos
+        // Navega a 'login' y elimina 'splash' del historial
         navController.navigate("login") {
             popUpTo("splash") { inclusive = true }
         }
@@ -26,11 +28,11 @@ fun SplashScreen(navController: NavController) {
     Box(
         modifier = Modifier
             .fillMaxSize()
-            .background(Color(0xFFF5F5F5)),
+            .background(Color(0xFFF5F5F5)), // Un fondo claro
         contentAlignment = Alignment.Center
     ) {
         Image(
-            painter = painterResource(id = R.drawable.novaic),
+            painter = painterResource(id = R.drawable.novaic), // Asume que tienes 'novaic' en drawable
             contentDescription = "Logo NOVA",
             modifier = Modifier.size(120.dp)
         )

@@ -9,9 +9,11 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
 import androidx.compose.ui.Modifier
 import androidx.core.splashscreen.SplashScreen.Companion.installSplashScreen
-import com.example.aplicacionjetpack.navigation.AppNavigation
+import com.example.aplicacionjetpack.ui.navigation.AppNavigation
 import com.example.aplicacionjetpack.ui.theme.AplicacionJetpackTheme
+import dagger.hilt.android.AndroidEntryPoint
 
+@AndroidEntryPoint
 class MainActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         // Instalar el Splash Screen nativo
