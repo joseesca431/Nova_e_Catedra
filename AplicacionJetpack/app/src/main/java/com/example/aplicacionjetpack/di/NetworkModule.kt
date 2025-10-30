@@ -1,8 +1,6 @@
-// Ruta: app/src/main/java/com/example/aplicacionjetpack/di/NetworkModule.kt
 package com.example.aplicacionjetpack.di
 
-// --- 👇👇👇 ¡ASEGÚRATE DE QUE ESTOS IMPORTS ESTÉN! 👇👇👇 ---
-import com.example.aplicacionjetpack.data.api.* // Importa TODAS las APIs
+import com.example.aplicacionjetpack.data.api.*
 import com.example.aplicacionjetpack.data.remote.interceptor.AuthInterceptor
 import dagger.Module
 import dagger.Provides
@@ -19,75 +17,42 @@ import javax.inject.Singleton
 @InstallIn(SingletonComponent::class)
 object NetworkModule {
 
-    // Cambia esto a tu URL de ngrok si es necesario
     private const val BASE_URL = "https://figurately-sinuous-isla.ngrok-free.dev/"
 
     @Provides
     @Singleton
-    fun provideLoggingInterceptor(): HttpLoggingInterceptor {
-        return HttpLoggingInterceptor().apply {
-            setLevel(HttpLoggingInterceptor.Level.BODY)
-        }
-    }
+    fun provideLoggingInterceptor(): HttpLoggingInterceptor =
+        HttpLoggingInterceptor().apply { setLevel(HttpLoggingInterceptor.Level.BODY) }
 
     @Provides
     @Singleton
     fun provideOkHttpClient(
         loggingInterceptor: HttpLoggingInterceptor,
         authInterceptor: AuthInterceptor
-    ): OkHttpClient {
-        return OkHttpClient.Builder()
-            .addInterceptor(loggingInterceptor)
-            .addInterceptor(authInterceptor)
-            .build()
-    }
+    ): OkHttpClient = OkHttpClient.Builder()
+        .addInterceptor(loggingInterceptor)
+        .addInterceptor(authInterceptor)
+        .build()
 
     @Provides
     @Singleton
-    fun provideRetrofit(okHttpClient: OkHttpClient): Retrofit {
-        return Retrofit.Builder()
-            .baseUrl(BASE_URL)
-            .client(okHttpClient)
-            .addConverterFactory(ScalarsConverterFactory.create())
-            .addConverterFactory(GsonConverterFactory.create())
-            .build()
-    }
+    fun provideRetrofit(okHttpClient: OkHttpClient): Retrofit = Retrofit.Builder()
+        .baseUrl(BASE_URL)
+        .client(okHttpClient)
+        .addConverterFactory(ScalarsConverterFactory.create())
+        .addConverterFactory(GsonConverterFactory.create())
+        .build()
 
-    // --- APIs QUE YA TENÍAS ---
-    @Provides
-    @Singleton
-    fun provideAuthApi(retrofit: Retrofit): AuthApi =
-        retrofit.create(AuthApi::class.java)
+    // --- PROVEEDORES DE APIs ---
+    @Provides @Singleton fun provideAuthApi(retrofit: Retrofit): AuthApi = retrofit.create(AuthApi::class.java)
+    @Provides @Singleton fun provideProductApi(retrofit: Retrofit): ProductApi = retrofit.create(ProductApi::class.java)
+    @Provides @Singleton fun provideResenaApi(retrofit: Retrofit): ResenaApi = retrofit.create(ResenaApi::class.java)
+    @Provides @Singleton fun provideCarritoApi(retrofit: Retrofit): CarritoApi = retrofit.create(CarritoApi::class.java)
+    @Provides @Singleton fun provideDireccionApi(retrofit: Retrofit): DireccionApi = retrofit.create(DireccionApi::class.java)
+    @Provides @Singleton fun providePedidoApi(retrofit: Retrofit): PedidoApi = retrofit.create(PedidoApi::class.java)
+    @Provides @Singleton fun provideUserApi(retrofit: Retrofit): UserApi = retrofit.create(UserApi::class.java)
+    @Provides @Singleton fun provideNotificacionApi(retrofit: Retrofit): NotificacionApi = retrofit.create(NotificacionApi::class.java)
+    @Provides @Singleton fun provideHistorialPedidoApi(retrofit: Retrofit): HistorialPedidoApi = retrofit.create(HistorialPedidoApi::class.java)
 
-    @Provides
-    @Singleton
-    fun provideProductApi(retrofit: Retrofit): ProductApi =
-        retrofit.create(ProductApi::class.java)
-
-    @Provides
-    @Singleton
-    fun provideResenaApi(retrofit: Retrofit): ResenaApi =
-        retrofit.create(ResenaApi::class.java)
-
-    // --- 👇👇👇 ¡¡¡LAS APIs QUE FALTABAN!!! 👇👇👇 ---
-
-    @Provides
-    @Singleton
-    fun provideCarritoApi(retrofit: Retrofit): CarritoApi =
-        retrofit.create(CarritoApi::class.java)
-
-    @Provides
-    @Singleton
-    fun provideDireccionApi(retrofit: Retrofit): DireccionApi =
-        retrofit.create(DireccionApi::class.java)
-
-    @Provides
-    @Singleton
-    fun providePedidoApi(retrofit: Retrofit): PedidoApi =
-        retrofit.create(PedidoApi::class.java)
-
-    @Provides
-    @Singleton
-    fun provideUserApi(retrofit: Retrofit): UserApi =
-        retrofit.create(UserApi::class.java)
+    // --- 👇👇👇 ¡¡¡EL @Binds ILEGAL Y DUPLICADO HA SIDO ELIMINADO DE AQUÍ!!! 👇👇👇 ---
 }

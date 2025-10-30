@@ -4,8 +4,7 @@ import com.google.gson.annotations.SerializedName
 
 /**
  * DTO genérico para mapear PagedModel (Spring HATEOAS).
- * Incluye los posibles nombres que tu API podría devolver dentro de _embedded,
- * incluyendo "productoResponseList" y "resenaResponseList".
+ * AHORA INCLUYE historialPedidoResponseList.
  */
 data class PagedResponse<T>(
     @SerializedName("_embedded")
@@ -14,13 +13,16 @@ data class PagedResponse<T>(
     val links: Links?,
     val page: PageInfo?
 ) {
+    // --- 👇👇👇 ¡¡¡LA CORRECCIÓN DE LA VICTORIA ESTÁ AQUÍ!!! 👇👇👇 ---
     val content: List<T>
         get() = embedded?.productoResponseList ?:
         embedded?.pedidoResponseList ?:
         embedded?.userResponseList ?:
         embedded?.tipoProductoResponseList ?:
-        embedded?.resenaResponseList ?: // Soporta reseñas paginadas
+        embedded?.resenaResponseList ?:
+        embedded?.historialPedidoResponseList ?: // <-- ¡AÑADIMOS LA LÍNEA CORRECTA QUE FALTABA!
         emptyList()
+    // --- ----------------------------------------------------- ---
 
     val totalPages: Int get() = page?.totalPages ?: 0
     val totalElements: Long get() = page?.totalElements ?: 0L
@@ -40,7 +42,11 @@ data class Embedded<T>(
     @SerializedName("tipoProductoResponseList")
     val tipoProductoResponseList: List<T>?,
     @SerializedName("resenaResponseList")
-    val resenaResponseList: List<T>? // <-- importante para reseñas paginadas
+    val resenaResponseList: List<T>?,
+    // --- 👇👇👇 ¡¡¡LA PROPIEDAD QUE FALTABA PARA QUE GSON LA RECONOZCA!!! 👇👇👇 ---
+    @SerializedName("historialPedidoResponseList")
+    val historialPedidoResponseList: List<T>?
+    // --- --------------------------------------------------------------------- ---
 )
 
 data class Links(

@@ -21,6 +21,7 @@ fun AppNavigation() {
         navController = navController,
         startDestination = "splash"
     ) {
+        // ... (splash, login, register no cambian) ...
         composable("splash") {
             SplashScreen(navController = navController)
         }
@@ -74,20 +75,17 @@ fun AppNavigation() {
             )
         }
 
-        // --- 👇👇👇 ¡LA RUTA DE BÚSQUEDA CORREGIDA! 👇👇👇 ---
         composable("busqueda") {
-            val viewModel: SearchViewModel = hiltViewModel() // Crea el nuevo ViewModel
+            val viewModel: SearchViewModel = hiltViewModel()
             BusquedaScreen(
                 navController = navController,
                 uiState = viewModel.uiState,
-                // Llama a la función que SÍ existe en SearchViewModel
                 onQueryChange = viewModel::onSearchQueryChanged,
                 onProductClick = { product ->
                     navController.navigate("product_detail/${product.idProducto}")
                 }
             )
         }
-        // --- -------------------------------------------- ---
 
         composable(
             route = "product_detail/{productId}",
@@ -163,6 +161,20 @@ fun AppNavigation() {
 
         composable("profile") {
             ProfileScreen(navController = navController)
+        }
+
+        // --- 👇👇👇 ¡¡¡AÑADIMOS LA NUEVA RUTA!!! 👇👇👇 ---
+        composable("editar_profile") {
+            EditarProfileScreen(navController = navController)
+        }
+        // --- --------------------------------------- ---
+
+        composable("historial_compras") {
+            HistorialComprasScreen(navController = navController)
+        }
+
+        composable("notificaciones") {
+            NotificacionesScreen(navController = navController)
         }
     }
 }

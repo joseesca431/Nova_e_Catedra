@@ -1,7 +1,6 @@
-// Ruta: app/src/main/java/com/example/aplicacionjetpack/di/RepositoryModule.kt
 package com.example.aplicacionjetpack.di
 
-import com.example.aplicacionjetpack.data.repository.* // Importa todo del paquete
+import com.example.aplicacionjetpack.data.repository.*
 import dagger.Binds
 import dagger.Module
 import dagger.hilt.InstallIn
@@ -12,47 +11,15 @@ import javax.inject.Singleton
 @InstallIn(SingletonComponent::class)
 abstract class RepositoryModule {
 
-    @Binds
-    @Singleton
-    abstract fun bindAuthRepository(
-        authRepositoryImpl: AuthRepositoryImpl
-    ): AuthRepository
+    @Binds @Singleton abstract fun bindAuthRepository(impl: AuthRepositoryImpl): AuthRepository
+    @Binds @Singleton abstract fun bindProductRepository(impl: ProductRepositoryImpl): ProductRepository
+    @Binds @Singleton abstract fun bindResenaRepository(impl: ResenaRepositoryImpl): ResenaRepository
+    @Binds @Singleton abstract fun bindCarritoRepository(impl: CarritoRepositoryImpl): CarritoRepository
+    @Binds @Singleton abstract fun bindDireccionRepository(impl: DireccionRepositoryImpl): DireccionRepository
+    @Binds @Singleton abstract fun bindPedidoRepository(impl: PedidoRepositoryImpl): PedidoRepository
+    @Binds @Singleton abstract fun bindNotificacionRepository(impl: NotificacionRepositoryImpl): NotificacionRepository
+    @Binds @Singleton abstract fun bindHistorialPedidoRepository(impl: HistorialPedidoRepositoryImpl): HistorialPedidoRepository
 
-    @Binds
-    @Singleton
-    abstract fun bindProductRepository(
-        // --- ¡¡¡LA CORRECCIÓN DEFINITIVA!!! ---
-        // Ahora Hilt sabe que para un ProductRepository, debe usar un ProductRepositoryImpl.
-        productRepositoryImpl: ProductRepositoryImpl
-    ): ProductRepository
-
-    @Binds
-    @Singleton
-    abstract fun bindResenaRepository(
-        resenaRepositoryImpl: ResenaRepositoryImpl
-    ): ResenaRepository
-
-    @Binds
-    @Singleton
-    abstract fun bindCarritoRepository(
-        carritoRepositoryImpl: CarritoRepositoryImpl
-    ): CarritoRepository
-
-    @Binds
-    @Singleton
-    abstract fun bindDireccionRepository(
-        direccionRepositoryImpl: DireccionRepositoryImpl
-    ): DireccionRepository
-
-    @Binds
-    @Singleton
-    abstract fun bindPedidoRepository(
-        pedidoRepositoryImpl: PedidoRepositoryImpl
-    ): PedidoRepository
-
-    @Binds
-    @Singleton
-    abstract fun bindUserRepository(
-        userRepositoryImpl: UserRepositoryImpl
-    ): UserRepository
+    // --- El @Binds que movimos vive aquí, donde pertenece ---
+    @Binds @Singleton abstract fun bindUserRepository(impl: UserRepositoryImpl): UserRepository
 }
