@@ -10,8 +10,7 @@ import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.ArrowBack
 import androidx.compose.material3.*
-import androidx.compose.runtime.Composable
-import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
@@ -27,6 +26,9 @@ import com.example.aplicacionjetpack.ui.theme.OrangeAccent
 import com.example.aplicacionjetpack.ui.theme.PurpleDark
 import com.example.aplicacionjetpack.ui.viewmodel.UserViewModel
 
+// Color solicitado por ti: negro puro para texto/placeholder fuerte
+private val BrandBlack = Color(0xFF000000)
+
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun EditarProfileScreen(
@@ -34,6 +36,10 @@ fun EditarProfileScreen(
     viewModel: UserViewModel = hiltViewModel()
 ) {
     val uiState = viewModel.uiState
+
+    // Dialog state para mostrar errores de validación
+    var showValidationDialog by remember { mutableStateOf(false) }
+    var validationMessage by remember { mutableStateOf("") }
 
     // Cuando la actualización sea exitosa, retrocedemos
     LaunchedEffect(key1 = uiState.updateSuccess) {
@@ -86,19 +92,25 @@ fun EditarProfileScreen(
                         ProfileTextField(
                             label = "Nombre de usuario",
                             value = uiState.username,
-                            onValueChange = viewModel::onUsernameChanged
+                            onValueChange = viewModel::onUsernameChanged,
+                            labelColor = BrandBlack,
+                            textColor = BrandBlack
                         )
                         ProfileTextField(
                             label = "Correo electrónico",
                             value = uiState.email,
                             onValueChange = viewModel::onEmailChanged,
-                            keyboardType = KeyboardType.Email
+                            keyboardType = KeyboardType.Email,
+                            labelColor = BrandBlack,
+                            textColor = BrandBlack
                         )
                         ProfileTextField(
                             label = "Teléfono",
                             value = uiState.telefono,
                             onValueChange = viewModel::onTelefonoChanged,
-                            keyboardType = KeyboardType.Phone
+                            keyboardType = KeyboardType.Phone,
+                            labelColor = BrandBlack,
+                            textColor = BrandBlack
                         )
                     }
                 }
@@ -121,14 +133,18 @@ fun EditarProfileScreen(
                             label = "Nueva Contraseña (Opcional)",
                             value = uiState.newPassword,
                             onValueChange = viewModel::onNewPasswordChanged,
-                            isPassword = true
+                            isPassword = true,
+                            labelColor = BrandBlack,
+                            textColor = BrandBlack
                         )
                         ProfileTextField(
                             label = "Confirmar Nueva Contraseña",
                             value = uiState.confirmNewPassword,
                             onValueChange = viewModel::onConfirmNewPasswordChanged,
                             isPassword = true,
-                            isVisible = uiState.newPassword.isNotEmpty()
+                            isVisible = uiState.newPassword.isNotEmpty(),
+                            labelColor = BrandBlack,
+                            textColor = BrandBlack
                         )
                     }
                 }
@@ -144,26 +160,29 @@ fun EditarProfileScreen(
                         Text(
                             "Confirmar Cambios",
                             style = MaterialTheme.typography.titleMedium,
-                            color = OrangeAccent,
+                            color = OrangeAccent, // solicitado: este título en naranja
                             modifier = Modifier.padding(bottom = 8.dp)
                         )
                         Text(
                             "Para guardar cualquier cambio, introduce tu contraseña actual.",
                             style = MaterialTheme.typography.bodySmall,
-                            modifier = Modifier.padding(bottom = 16.dp)
+                            modifier = Modifier.padding(bottom = 16.dp),
+                            color = BrandBlack.copy(alpha = 0.9f)
                         )
                         ProfileTextField(
                             label = "Contraseña Actual (*)",
                             value = uiState.currentPassword,
                             onValueChange = viewModel::onCurrentPasswordChanged,
-                            isPassword = true
+                            isPassword = true,
+                            labelColor = BrandBlack,
+                            textColor = BrandBlack
                         )
                     }
                 }
 
                 Spacer(modifier = Modifier.height(8.dp))
 
-                // --- MENSAJE DE ERROR ---
+                // --- MENSAJE DE ERROR (desde ViewModel) ---
                 if (uiState.error != null) {
                     Text(
                         text = uiState.error,
@@ -174,9 +193,38 @@ fun EditarProfileScreen(
                     )
                 }
 
-                // --- BOTÓN DE GUARDAR ---
+                // --- BOTÓN DE GUARDAR: valida campos antes de llamar a viewModel.updateProfile() ---
                 Button(
-                    onClick = { viewModel.updateProfile() },
+                    onClick = {
+                        // VALIDACIÓN: construye lista de campos faltantes
+                        val missing = mutableListOf<String>()
+                        if (uiState.username.isBlank()) missing.add("Nombre de usuario")
+                        if (uiState.email.isBlank()) missing.add("Correo electrónico")
+                        if (uiState.telefono.isBlank()) missing.add("Teléfono")
+                        // Si el usuario está intentando cambiar contraseña, exige confirmación
+                        if (uiState.newPassword.isNotEmpty()) {
+                            if (uiState.confirmNewPassword.isBlank()) missing.add("Confirmar nueva contraseña")
+                            else if (uiState.newPassword != uiState.confirmNewPassword) {
+                                validationMessage = "Las contraseñas nuevas no coinciden. Por favor verifica."
+                                showValidationDialog = true
+                                return@Button
+                            }
+                            // optional: could add password strength validation here
+                        }
+                        // Contraseña actual es obligatoria para guardar cambios
+                        if (uiState.currentPassword.isBlank()) missing.add("Contraseña actual")
+
+                        if (missing.isNotEmpty()) {
+                            // Construir mensaje amable y claro
+                            val listText = missing.joinToString(separator = "\n") { "• $it" }
+                            validationMessage = "Para continuar falta completar lo siguiente:\n\n$listText\n\nPor favor complétalo para poder guardar los cambios."
+                            showValidationDialog = true
+                            return@Button
+                        }
+
+                        // Si todo OK, llama al ViewModel
+                        viewModel.updateProfile()
+                    },
                     modifier = Modifier
                         .fillMaxWidth()
                         .height(50.dp),
@@ -193,9 +241,31 @@ fun EditarProfileScreen(
             }
         }
     }
+
+    // --- DIALOGO DE VALIDACIÓN AMABLE ---
+    if (showValidationDialog) {
+        AlertDialog(
+            onDismissRequest = { showValidationDialog = false },
+            confirmButton = {
+                TextButton(onClick = { showValidationDialog = false }) {
+                    Text("OK", color = OrangeAccent, fontWeight = FontWeight.Bold)
+                }
+            },
+            title = { Text("Faltan datos", color = BrandBlack, fontWeight = FontWeight.SemiBold) },
+            text = {
+                Text(
+                    validationMessage,
+                    color = BrandBlack.copy(alpha = 0.9f),
+                    fontSize = 14.sp
+                )
+            },
+            containerColor = Color.White
+        )
+    }
 }
 
-// Composable reutilizable para los campos de texto del perfil
+// Composable reutilizable para los campos de texto del perfil (ahora con control de colores)
+@OptIn(ExperimentalMaterial3Api::class)
 @Composable
 private fun ProfileTextField(
     label: String,
@@ -204,19 +274,33 @@ private fun ProfileTextField(
     modifier: Modifier = Modifier,
     keyboardType: KeyboardType = KeyboardType.Text,
     isPassword: Boolean = false,
-    isVisible: Boolean = true
+    isVisible: Boolean = true,
+    labelColor: Color = BrandBlack,
+    textColor: Color = BrandBlack
 ) {
     if (!isVisible) return
 
     OutlinedTextField(
         value = value,
         onValueChange = onValueChange,
-        label = { Text(label) },
+        label = { Text(label, color = labelColor) },
+        placeholder = { Text(text = label, color = labelColor.copy(alpha = 0.5f)) },
         modifier = modifier
             .fillMaxWidth()
             .padding(bottom = 8.dp),
         singleLine = true,
         visualTransformation = if (isPassword) PasswordVisualTransformation() else VisualTransformation.None,
-        keyboardOptions = KeyboardOptions(keyboardType = keyboardType)
+        keyboardOptions = KeyboardOptions(keyboardType = keyboardType),
+        colors = TextFieldDefaults.outlinedTextFieldColors(
+            focusedBorderColor = OrangeAccent,
+            unfocusedBorderColor = Color(0xFFDDDDDD),
+            containerColor = Color.White,
+            focusedTextColor = textColor,
+            unfocusedTextColor = textColor.copy(alpha = 0.95f),
+            cursorColor = OrangeAccent,
+            focusedLabelColor = labelColor,
+            unfocusedLabelColor = labelColor.copy(alpha = 0.85f)
+        ),
+        shape = RoundedCornerShape(8.dp)
     )
 }
