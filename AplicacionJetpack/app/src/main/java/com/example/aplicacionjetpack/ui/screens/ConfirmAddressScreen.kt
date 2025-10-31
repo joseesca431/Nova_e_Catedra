@@ -11,8 +11,10 @@ import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Delete
 import androidx.compose.material3.*
@@ -71,7 +73,6 @@ private val mapHtml = """
 </html>
 """.trimIndent()
 
-
 @OptIn(ExperimentalMaterial3Api::class)
 @SuppressLint("SetJavaScriptEnabled")
 @Composable
@@ -83,6 +84,11 @@ fun ConfirmAddressScreen(
     val uiState = viewModel.uiState
     var selectedDireccionId by remember { mutableStateOf<Long?>(null) }
     var mapTouched by remember { mutableStateOf(false) }
+
+    // Sincroniza el ID seleccionado con el ViewModel
+    LaunchedEffect(selectedDireccionId) {
+        viewModel.setUsarDireccionExistenteId(selectedDireccionId)
+    }
 
     Scaffold(
         topBar = {
@@ -108,41 +114,32 @@ fun ConfirmAddressScreen(
                     .fillMaxWidth()
                     .weight(1f)
             ) {
-                // --- 👇👇👇 ¡¡¡EL CÓDIGO COMPLETO Y RESTAURADO DEL MAPA!!! 👇👇👇 ---
                 AndroidView(
                     factory = { ctx ->
                         WebView(ctx).apply {
                             layoutParams = ViewGroup.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.MATCH_PARENT)
                             settings.javaScriptEnabled = true
-
-                            // Lógica para interceptar el clic del mapa
                             webViewClient = object : WebViewClient() {
                                 override fun shouldOverrideUrlLoading(view: WebView?, request: WebResourceRequest?): Boolean {
                                     val url = request?.url ?: return false
                                     if (url.scheme == "app" && url.host == "address") {
                                         val lat = url.getQueryParameter("lat")?.toDoubleOrNull()
                                         val lon = url.getQueryParameter("lon")?.toDoubleOrNull()
-
                                         if (lat != null && lon != null) {
                                             mapTouched = true
-                                            // Limpiamos la selección de cualquier tarjeta de dirección existente
                                             selectedDireccionId = null
-                                            // Llamamos al ViewModel para que busque la nueva dirección
                                             viewModel.fetchAddressFromCoordinates(lat, lon)
                                         }
-                                        return true // Evita la navegación
+                                        return true
                                     }
                                     return super.shouldOverrideUrlLoading(view, request)
                                 }
                             }
-
-                            // Carga el código HTML en el WebView
                             loadDataWithBaseURL(null, mapHtml, "text/html", "UTF-8", null)
                         }
                     },
                     modifier = Modifier.fillMaxSize()
                 )
-                // --- ----------------------------------------------------------- ---
             }
 
             Column(
@@ -150,6 +147,7 @@ fun ConfirmAddressScreen(
                     .fillMaxWidth()
                     .background(Color.White)
                     .padding(16.dp)
+                    .verticalScroll(rememberScrollState()) // Añadimos scroll a la parte inferior
             ) {
                 Text("Mis Direcciones", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold, modifier = Modifier.padding(bottom = 8.dp))
                 if (uiState.isLoadingDirecciones) {
@@ -176,9 +174,29 @@ fun ConfirmAddressScreen(
                 }
 
                 Spacer(modifier = Modifier.height(16.dp))
+
+                // --- 👇👇👇 ¡¡¡LA LÓGICA DE LA VICTORIA ESTÁ AQUÍ!!! 👇👇👇 ---
+                // Si es una dirección NUEVA (tocada del mapa), mostramos el campo de alias.
+                if (uiState.usarDireccionExistenteId == null) {
+                    OutlinedTextField(
+                        value = uiState.aliasDireccion,
+                        onValueChange = viewModel::onAliasChange,
+                        label = { Text("Alias para esta nueva dirección (Ej: Casa, Oficina)") },
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(bottom = 8.dp),
+                        singleLine = true,
+                        colors = OutlinedTextFieldDefaults.colors(
+                            focusedBorderColor = PurpleDark,
+                            unfocusedBorderColor = Color.LightGray
+                        )
+                    )
+                }
+                // --- ----------------------------------------------------- ---
+
                 Text("Enviar a:", style = MaterialTheme.typography.titleSmall, color = Color.Gray)
 
-                Box(contentAlignment = Alignment.CenterStart, modifier = Modifier.height(48.dp)) {
+                Box(contentAlignment = Alignment.CenterStart, modifier = Modifier.defaultMinSize(minHeight = 48.dp)) {
                     when {
                         mapTouched && uiState.isLoadingAddressFromMap -> {
                             Row(verticalAlignment = Alignment.CenterVertically) {
@@ -198,7 +216,7 @@ fun ConfirmAddressScreen(
                         }
                         else -> {
                             Text(
-                                text = "Toca el mapa para seleccionar una dirección",
+                                text = "Toca el mapa o selecciona una dirección",
                                 color = Color.Gray,
                                 fontSize = 16.sp
                             )
@@ -212,8 +230,6 @@ fun ConfirmAddressScreen(
 
                 Button(
                     onClick = {
-                        // Solo guarda la selección y navega. NO crea pedidos.
-                        viewModel.setUsarDireccionExistenteId(selectedDireccionId)
                         navController.navigate("detalles_pago/$idCarrito")
                     },
                     enabled = viewModel.isAddressValid && !uiState.isLoading,
@@ -263,15 +279,12 @@ private fun DireccionGuardadaCard(
                 .size(24.dp)
                 .background(Color.Gray.copy(alpha = 0.5f), CircleShape)
         ) {
-            // --- 👇👇👇 ¡¡¡LA CORRECCIÓN DE LA HUMILDAD!!! 👇👇👇 ---
             Icon(
-                imageVector = Icons.Default.Delete, // ESTA ES LA FORMA CORRECTA
+                imageVector = Icons.Default.Delete,
                 contentDescription = "Borrar dirección",
                 tint = Color.White,
                 modifier = Modifier.size(16.dp)
             )
-            // --- -------------------------------------------- ---
         }
     }
 }
-

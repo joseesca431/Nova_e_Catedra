@@ -76,14 +76,11 @@ class CheckoutViewModel @Inject constructor(
         }
     }
 
-    // --- 👇👇👇 ¡¡¡LA LÓGICA DE BORRADO INTELIGENTE!!! 👇👇👇 ---
     fun deleteDireccion(idDireccion: Long) {
         viewModelScope.launch {
             val result = direccionRepository.deleteDireccion(idDireccion)
             if (result.isSuccess) {
-                // Si la dirección borrada era la que estaba seleccionada en el formulario...
                 if (uiState.usarDireccionExistenteId == idDireccion) {
-                    // ...limpiamos el formulario para evitar usar datos "fantasma".
                     uiState = uiState.copy(
                         departamento = "",
                         municipio = "",
@@ -94,14 +91,12 @@ class CheckoutViewModel @Inject constructor(
                         usarDireccionExistenteId = null
                     )
                 }
-                // Recargamos la lista de direcciones guardadas para que desaparezca la borrada.
                 loadDireccionesGuardadas()
             } else {
                 uiState = uiState.copy(error = "No se pudo borrar la dirección.")
             }
         }
     }
-    // --- ----------------------------------------------------- ---
 
     fun onDireccionSeleccionada(direccion: DireccionResponse) {
         uiState = uiState.copy(
@@ -127,13 +122,18 @@ class CheckoutViewModel @Inject constructor(
                     latitud = lat,
                     longitud = lon,
                     isLoadingAddressFromMap = false,
-                    aliasDireccion = "Nueva Ubicación" // Puedes poner un alias por defecto
+                    aliasDireccion = "" // Dejamos el alias vacío para que el usuario lo llene
                 )
             } catch (e: Exception) {
                 uiState = uiState.copy(isLoadingAddressFromMap = false, error = "No se pudo obtener la dirección.")
                 Log.e(TAG, "Error al obtener dirección desde coordenadas", e)
             }
         }
+    }
+
+    // --- FUNCIÓN PARA EL ALIAS (SE MANTIENE) ---
+    fun onAliasChange(nuevoAlias: String) {
+        uiState = uiState.copy(aliasDireccion = nuevoAlias)
     }
 
     fun setUsarDireccionExistenteId(id: Long?) {
@@ -164,7 +164,10 @@ class CheckoutViewModel @Inject constructor(
 
     private data class AddressInfo(val calle: String, val ciudad: String, val depto: String)
 
-    val isAddressValid: Boolean get() = uiState.departamento.isNotBlank() && uiState.municipio.isNotBlank() && uiState.direccion.isNotBlank()
+    // --- 👇👇👇 ¡¡¡LA VALIDACIÓN SIMPLE Y FUNCIONAL HA VUELTO!!! 👇👇👇 ---
+    val isAddressValid: Boolean
+        get() = uiState.departamento.isNotBlank() && uiState.municipio.isNotBlank() && uiState.direccion.isNotBlank()
+    // --- ---------------------------------------------------------------- ---
 
     fun onMetodoPagoChange(nuevoMetodo: TipoPago) { uiState = uiState.copy(metodoPagoSeleccionado = nuevoMetodo, isDropdownExpanded = false, error = null) }
     fun onDropdownDismiss() { uiState = uiState.copy(isDropdownExpanded = false) }
@@ -189,10 +192,14 @@ class CheckoutViewModel @Inject constructor(
     }
 
     fun processFinalCheckout(idCarrito: Long) {
-        if (!isAddressValid) {
-            uiState = uiState.copy(error = "La dirección de entrega no es válida.")
+        // --- 👇👇👇 ¡¡¡LA VALIDACIÓN DEL ALIAS AHORA VIVE AQUÍ, DONDE DEBE!!! 👇👇👇 ---
+        val isNewAddress = uiState.usarDireccionExistenteId == null
+        if (!isAddressValid || (isNewAddress && uiState.aliasDireccion.isBlank())) {
+            uiState = uiState.copy(error = "La dirección (y el alias si es nueva) no es válida.")
             return
         }
+        // --- ----------------------------------------------------------------------- ---
+
         if (!isPaymentValid) {
             uiState = uiState.copy(error = "Los datos del método de pago son inválidos.")
             return
@@ -214,31 +221,23 @@ class CheckoutViewModel @Inject constructor(
                 cuponCodigo = null,
                 idDireccion = idDireccionFinal
             )
-            Log.d(TAG, "Iniciando checkout de 2 pasos. Paso 1: Creando pedido...")
             val checkoutResult = pedidoRepository.checkout(pedidoRequest)
             checkoutResult.onSuccess { pedidoCreado ->
-                Log.d(TAG, "Paso 1 exitoso. Pedido Creado ID: ${pedidoCreado.idPedido}. Iniciando Paso 2: Pagar...")
-
                 val pagoRequest = PagoRequest(
                     detallesPago = buildPaymentDetailsJson(),
                     usuario = UserRequest(idUser = userId)
                 )
-
                 val pagarResult = pedidoRepository.pagar(pedidoCreado.idPedido, pagoRequest)
                 pagarResult.onSuccess {
-                    Log.d(TAG, "Paso 2 exitoso. El pago se completó.")
                     uiState = uiState.copy(isLoading = false, checkoutSuccess = true)
                 }.onFailure { e ->
-                    Log.e(TAG, "Paso 2 (Pagar) falló después de un checkout exitoso.", e)
                     handleError("El pago no pudo ser procesado: ${e.message}")
                 }
             }.onFailure { e ->
-                Log.e(TAG, "Paso 1 (Checkout) falló.", e)
                 handleError("No se pudo iniciar el pedido: ${e.message}")
             }
         }
     }
-
 
     private fun buildPaymentDetailsJson(): String {
         val json = JSONObject()
@@ -258,11 +257,9 @@ class CheckoutViewModel @Inject constructor(
     private suspend fun getFinalDireccionId(userId: Long): Result<Long> {
         return withContext(Dispatchers.IO) {
             if (uiState.usarDireccionExistenteId != null) {
-                Log.d(TAG, "Usando dirección existente con ID: ${uiState.usarDireccionExistenteId}")
                 return@withContext Result.success(uiState.usarDireccionExistenteId!!)
             }
 
-            Log.d(TAG, "Creando nueva dirección a partir de las coordenadas del mapa.")
             val request = DireccionRequest(
                 alias = uiState.aliasDireccion,
                 calle = uiState.direccion,
@@ -272,7 +269,6 @@ class CheckoutViewModel @Inject constructor(
                 longitud = uiState.longitud
             )
             val result = direccionRepository.createDireccion(userId, request)
-
             result.map { it.idDireccion }
         }
     }
