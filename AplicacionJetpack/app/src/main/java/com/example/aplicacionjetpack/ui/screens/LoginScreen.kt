@@ -135,18 +135,7 @@ fun LoginScreen(
 
         Spacer(modifier = Modifier.height(16.dp))
 
-        // --- Botones Sociales ---
-        OutlinedButton(onClick = { /* TODO: viewModel.onGoogleLoginClicked() */ }, modifier = Modifier.fillMaxWidth().height(50.dp), shape = RoundedCornerShape(8.dp)) {
-            Icon(painter = painterResource(id = R.drawable.ic_google2), contentDescription = "Google", modifier = Modifier.size(24.dp), tint = Color(0xFF240052))
-            Spacer(modifier = Modifier.width(8.dp))
-            Text("CONTINUA CON GOOGLE", fontSize = 14.sp, fontWeight = FontWeight.Medium, color = Color.Black)
-        }
-        Spacer(modifier = Modifier.height(12.dp))
-        OutlinedButton(onClick = { /* TODO: viewModel.onFacebookLoginClicked() */ }, modifier = Modifier.fillMaxWidth().height(50.dp), shape = RoundedCornerShape(8.dp)) {
-            Icon(painter = painterResource(id = R.drawable.ic_facebook2), contentDescription = "Facebook", modifier = Modifier.size(24.dp), tint = Color(0xFF240052))
-            Spacer(modifier = Modifier.width(8.dp))
-            Text("CONTINUA CON FACEBOOK", fontSize = 14.sp, fontWeight = FontWeight.Medium, color = Color.Black)
-        }
+        
 
         Spacer(modifier = Modifier.height(24.dp))
 
