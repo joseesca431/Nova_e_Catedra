@@ -76,16 +76,32 @@ class CheckoutViewModel @Inject constructor(
         }
     }
 
+    // --- 👇👇👇 ¡¡¡LA LÓGICA DE BORRADO INTELIGENTE!!! 👇👇👇 ---
     fun deleteDireccion(idDireccion: Long) {
         viewModelScope.launch {
             val result = direccionRepository.deleteDireccion(idDireccion)
             if (result.isSuccess) {
+                // Si la dirección borrada era la que estaba seleccionada en el formulario...
+                if (uiState.usarDireccionExistenteId == idDireccion) {
+                    // ...limpiamos el formulario para evitar usar datos "fantasma".
+                    uiState = uiState.copy(
+                        departamento = "",
+                        municipio = "",
+                        direccion = "",
+                        aliasDireccion = "Casa",
+                        latitud = null,
+                        longitud = null,
+                        usarDireccionExistenteId = null
+                    )
+                }
+                // Recargamos la lista de direcciones guardadas para que desaparezca la borrada.
                 loadDireccionesGuardadas()
             } else {
                 uiState = uiState.copy(error = "No se pudo borrar la dirección.")
             }
         }
     }
+    // --- ----------------------------------------------------- ---
 
     fun onDireccionSeleccionada(direccion: DireccionResponse) {
         uiState = uiState.copy(
@@ -110,7 +126,8 @@ class CheckoutViewModel @Inject constructor(
                     direccion = addressInfo.calle,
                     latitud = lat,
                     longitud = lon,
-                    isLoadingAddressFromMap = false
+                    isLoadingAddressFromMap = false,
+                    aliasDireccion = "Nueva Ubicación" // Puedes poner un alias por defecto
                 )
             } catch (e: Exception) {
                 uiState = uiState.copy(isLoadingAddressFromMap = false, error = "No se pudo obtener la dirección.")
@@ -134,9 +151,9 @@ class CheckoutViewModel @Inject constructor(
                 val response = reader.readText()
                 val json = JSONObject(response).getJSONObject("address")
                 AddressInfo(
-                    calle = json.optString("road", ""),
-                    ciudad = json.optString("city", json.optString("town", json.optString("village", ""))),
-                    depto = json.optString("state", "")
+                    calle = json.optString("road", "Calle no encontrada"),
+                    ciudad = json.optString("city", json.optString("town", json.optString("village", "Municipio no encontrado"))),
+                    depto = json.optString("state", "Departamento no encontrado")
                 )
             } catch (e: Exception) {
                 Log.e(TAG, "Fallo en getAddressFromCoordinates", e)
@@ -202,14 +219,10 @@ class CheckoutViewModel @Inject constructor(
             checkoutResult.onSuccess { pedidoCreado ->
                 Log.d(TAG, "Paso 1 exitoso. Pedido Creado ID: ${pedidoCreado.idPedido}. Iniciando Paso 2: Pagar...")
 
-                // --- 👇👇👇 ¡¡¡LA LÍNEA QUE ARREGLA EL ERROR 400!!! 👇👇👇 ---
-                // Creamos el 'pagoRequest' con la estructura que el backend espera,
-                // incluyendo el objeto 'usuario' que contiene el 'idUser'.
                 val pagoRequest = PagoRequest(
                     detallesPago = buildPaymentDetailsJson(),
-                    usuario = UserRequest(idUser = userId) // Añadimos el usuario
+                    usuario = UserRequest(idUser = userId)
                 )
-                // --- ----------------------------------------------------- ---
 
                 val pagarResult = pedidoRepository.pagar(pedidoCreado.idPedido, pagoRequest)
                 pagarResult.onSuccess {
@@ -245,8 +258,11 @@ class CheckoutViewModel @Inject constructor(
     private suspend fun getFinalDireccionId(userId: Long): Result<Long> {
         return withContext(Dispatchers.IO) {
             if (uiState.usarDireccionExistenteId != null) {
+                Log.d(TAG, "Usando dirección existente con ID: ${uiState.usarDireccionExistenteId}")
                 return@withContext Result.success(uiState.usarDireccionExistenteId!!)
             }
+
+            Log.d(TAG, "Creando nueva dirección a partir de las coordenadas del mapa.")
             val request = DireccionRequest(
                 alias = uiState.aliasDireccion,
                 calle = uiState.direccion,
@@ -256,6 +272,7 @@ class CheckoutViewModel @Inject constructor(
                 longitud = uiState.longitud
             )
             val result = direccionRepository.createDireccion(userId, request)
+
             result.map { it.idDireccion }
         }
     }

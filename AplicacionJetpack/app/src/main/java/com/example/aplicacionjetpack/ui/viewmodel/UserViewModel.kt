@@ -35,7 +35,6 @@ class UserViewModel @Inject constructor(
     var uiState by mutableStateOf(UserUiState())
         private set
 
-    // Guardamos los datos originales para saber si algo cambió
     private var originalUsername: String = ""
     private var originalEmail: String = ""
     private var originalTelefono: String = ""
@@ -47,6 +46,7 @@ class UserViewModel @Inject constructor(
     // --- MANEJADORES DE EVENTOS ---
     fun onUsernameChanged(value: String) { uiState = uiState.copy(username = value, error = null) }
     fun onEmailChanged(value: String) { uiState = uiState.copy(email = value, error = null) }
+
     fun onTelefonoChanged(value: String) {
         val digits = value.filter { it.isDigit() }
         val formatted = when {
@@ -79,7 +79,6 @@ class UserViewModel @Inject constructor(
         }
     }
 
-    // --- 👇👇👇 ¡¡¡LA LÓGICA DE ACTUALIZACIÓN CORREGIDA PARA TU DTO!!! 👇👇👇 ---
     fun updateProfile() {
         val userId = AuthManager.userId ?: run {
             uiState = uiState.copy(error = "Sesión expirada.")
@@ -90,7 +89,7 @@ class UserViewModel @Inject constructor(
             return
         }
 
-        // --- VALIDACIONES CON EXPRESIONES REGULARES ---
+        // VALIDACIONES
         if (uiState.email.isNotBlank() && !Patterns.EMAIL_ADDRESS.matcher(uiState.email).matches()) {
             uiState = uiState.copy(error = "El formato del correo electrónico es inválido.")
             return
@@ -113,49 +112,38 @@ class UserViewModel @Inject constructor(
         val telefonoChanged = uiState.telefono != originalTelefono
         val passwordChanged = uiState.newPassword.isNotBlank()
 
-        val profileDataChanged = usernameChanged || emailChanged || telefonoChanged
-
-        if (!profileDataChanged && !passwordChanged) {
+        if (!usernameChanged && !emailChanged && !telefonoChanged && !passwordChanged) {
             uiState = uiState.copy(error = "No has realizado ningún cambio.")
             return
         }
 
         viewModelScope.launch {
             uiState = uiState.copy(isUpdating = true, error = null)
-            var somethingFailed = false
 
-            // --- Tarea 1: Actualizar perfil si los datos cambiaron ---
-            if (profileDataChanged) {
-                // --- 👇 ¡EL DTO AHORA SE CREA USANDO LOS NOMBRES CORRECTOS: 'username' y 'email'! 👇 ---
-                val profileRequest = UserUpdateRequest(
-                    currentPassword = uiState.currentPassword,
-                    username = uiState.username.takeIf { usernameChanged },
-                    email = uiState.email.takeIf { emailChanged },
-                    telefono = uiState.telefono.takeIf { telefonoChanged },
-                    newPassword = null // La contraseña se cambia en un endpoint separado
-                )
-                userRepository.updateProfile(userId, profileRequest).onFailure {
-                    somethingFailed = true
-                    uiState = uiState.copy(error = "Error al actualizar perfil: contraseña actual incorrecta o datos inválidos.")
-                }
-            }
+            val profileRequest = UserUpdateRequest(
+                currentPassword = uiState.currentPassword,
+                username = uiState.username.takeIf { usernameChanged },
+                email = uiState.email.takeIf { emailChanged },
+                telefono = uiState.telefono.takeIf { telefonoChanged },
+                newPassword = uiState.newPassword.takeIf { passwordChanged }
+            )
 
-            // --- Tarea 2: Cambiar contraseña si se proporcionó una nueva (y la Tarea 1 no falló) ---
-            if (passwordChanged && !somethingFailed) {
-                userRepository.changePassword(userId, uiState.currentPassword, uiState.newPassword).onFailure {
-                    somethingFailed = true
-                    uiState = uiState.copy(error = "Error al cambiar la contraseña: contraseña actual incorrecta.")
-                }
-            }
-
-            // --- Resultado Final ---
-            if (somethingFailed) {
-                uiState = uiState.copy(isUpdating = false)
-            } else {
+            userRepository.updateProfile(userId, profileRequest).onSuccess {
                 originalUsername = uiState.username
                 originalEmail = uiState.email
                 originalTelefono = uiState.telefono
                 uiState = uiState.copy(isUpdating = false, updateSuccess = true)
+
+            }.onFailure { exception ->
+                val errorMessage = if (exception.message?.contains("401") == true) {
+                    "La contraseña actual es incorrecta."
+                } else {
+                    "Error al actualizar perfil: ${exception.message}"
+                }
+                uiState = uiState.copy(
+                    isUpdating = false,
+                    error = errorMessage
+                )
             }
         }
     }
