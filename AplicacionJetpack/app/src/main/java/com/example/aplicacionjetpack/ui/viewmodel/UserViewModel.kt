@@ -1,30 +1,26 @@
 package com.example.aplicacionjetpack.ui.viewmodel
 
+import android.util.Log
+import android.util.Patterns // Import para la validación de email
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.setValue
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.example.aplicacionjetpack.data.AuthManager
-import com.example.aplicacionjetpack.data.dto.UserResponse
+import com.example.aplicacionjetpack.data.dto.UserUpdateRequest
 import com.example.aplicacionjetpack.data.repository.UserRepository
 import dagger.hilt.android.lifecycle.HiltViewModel
-import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 import javax.inject.Inject
 
-// --- ESTADO PARA LA PANTALLA DE EDICIÓN (ahora con campos de contraseña) ---
 data class UserUiState(
-    val user: UserResponse? = null,
     val username: String = "",
     val email: String = "",
     val telefono: String = "",
-
-    // Campos para manejo de contraseñas en la UI
     val newPassword: String = "",
     val confirmNewPassword: String = "",
     val currentPassword: String = "",
-
     val isLoading: Boolean = true,
     val isUpdating: Boolean = false,
     val updateSuccess: Boolean = false,
@@ -39,22 +35,40 @@ class UserViewModel @Inject constructor(
     var uiState by mutableStateOf(UserUiState())
         private set
 
+    // Guardamos los datos originales para saber si algo cambió
+    private var originalUsername: String = ""
+    private var originalEmail: String = ""
+    private var originalTelefono: String = ""
+
     init {
         loadUserProfile()
     }
 
-    private fun loadUserProfile() {
-        val userId = AuthManager.userId ?: run {
-            uiState = uiState.copy(isLoading = false, error = "Usuario no autenticado.")
-            return
+    // --- MANEJADORES DE EVENTOS ---
+    fun onUsernameChanged(value: String) { uiState = uiState.copy(username = value, error = null) }
+    fun onEmailChanged(value: String) { uiState = uiState.copy(email = value, error = null) }
+    fun onTelefonoChanged(value: String) {
+        val digits = value.filter { it.isDigit() }
+        val formatted = when {
+            digits.length > 4 -> "${digits.substring(0, 4)}-${digits.substring(4, digits.length.coerceAtMost(8))}"
+            else -> digits
         }
+        uiState = uiState.copy(telefono = formatted, error = null)
+    }
+    fun onNewPasswordChanged(value: String) { uiState = uiState.copy(newPassword = value, error = null) }
+    fun onConfirmNewPasswordChanged(value: String) { uiState = uiState.copy(confirmNewPassword = value, error = null) }
+    fun onCurrentPasswordChanged(value: String) { uiState = uiState.copy(currentPassword = value, error = null) }
 
+    private fun loadUserProfile() {
+        val userId = AuthManager.userId ?: return
         viewModelScope.launch {
             uiState = uiState.copy(isLoading = true)
             userRepository.getUserProfile(userId).onSuccess { user ->
+                originalUsername = user.username
+                originalEmail = user.email
+                originalTelefono = user.telefono ?: ""
                 uiState = uiState.copy(
                     isLoading = false,
-                    user = user,
                     username = user.username,
                     email = user.email,
                     telefono = user.telefono ?: ""
@@ -65,83 +79,83 @@ class UserViewModel @Inject constructor(
         }
     }
 
-    // --- EVENTOS DE CAMBIO (incluye contraseñas) ---
-    fun onUsernameChanged(newUsername: String) {
-        uiState = uiState.copy(username = newUsername, error = null)
-    }
-
-    fun onEmailChanged(newEmail: String) {
-        uiState = uiState.copy(email = newEmail, error = null)
-    }
-
-    fun onTelefonoChanged(newTelefono: String) {
-        uiState = uiState.copy(telefono = newTelefono, error = null)
-    }
-
-    fun onNewPasswordChanged(value: String) {
-        uiState = uiState.copy(newPassword = value, error = null)
-    }
-
-    fun onConfirmNewPasswordChanged(value: String) {
-        uiState = uiState.copy(confirmNewPassword = value, error = null)
-    }
-
-    fun onCurrentPasswordChanged(value: String) {
-        uiState = uiState.copy(currentPassword = value, error = null)
-    }
-
-    // --- LÓGICA DE ACTUALIZACIÓN ---
+    // --- 👇👇👇 ¡¡¡LA LÓGICA DE ACTUALIZACIÓN CORREGIDA PARA TU DTO!!! 👇👇👇 ---
     fun updateProfile() {
-        // Validaciones UI básicas
+        val userId = AuthManager.userId ?: run {
+            uiState = uiState.copy(error = "Sesión expirada.")
+            return
+        }
         if (uiState.currentPassword.isBlank()) {
-            uiState = uiState.copy(error = "Introduce tu contraseña actual para confirmar los cambios.")
+            uiState = uiState.copy(error = "Debes introducir tu contraseña actual para guardar.")
             return
         }
 
-        if (uiState.newPassword.isNotBlank()) {
-            if (uiState.newPassword != uiState.confirmNewPassword) {
-                uiState = uiState.copy(error = "La nueva contraseña y su confirmación no coinciden.")
-                return
-            }
-            if (uiState.newPassword.length < 6) {
-                uiState = uiState.copy(error = "La contraseña debe tener al menos 6 caracteres.")
-                return
-            }
+        // --- VALIDACIONES CON EXPRESIONES REGULARES ---
+        if (uiState.email.isNotBlank() && !Patterns.EMAIL_ADDRESS.matcher(uiState.email).matches()) {
+            uiState = uiState.copy(error = "El formato del correo electrónico es inválido.")
+            return
+        }
+        if (uiState.telefono.isNotBlank() && !uiState.telefono.matches("^\\d{4}-\\d{4}$".toRegex())) {
+            uiState = uiState.copy(error = "El formato del teléfono debe ser 1234-5678.")
+            return
+        }
+        if (uiState.newPassword.isNotEmpty() && uiState.newPassword.length < 6) {
+            uiState = uiState.copy(error = "La nueva contraseña debe tener al menos 6 caracteres.")
+            return
+        }
+        if (uiState.newPassword != uiState.confirmNewPassword) {
+            uiState = uiState.copy(error = "Las contraseñas nuevas no coinciden.")
+            return
         }
 
-        val userId = AuthManager.userId
-        if (userId == null) {
-            uiState = uiState.copy(error = "Usuario no autenticado.")
+        val usernameChanged = uiState.username != originalUsername
+        val emailChanged = uiState.email != originalEmail
+        val telefonoChanged = uiState.telefono != originalTelefono
+        val passwordChanged = uiState.newPassword.isNotBlank()
+
+        val profileDataChanged = usernameChanged || emailChanged || telefonoChanged
+
+        if (!profileDataChanged && !passwordChanged) {
+            uiState = uiState.copy(error = "No has realizado ningún cambio.")
             return
         }
 
         viewModelScope.launch {
             uiState = uiState.copy(isUpdating = true, error = null)
+            var somethingFailed = false
 
-            try {
-                // ----- AQUÍ puedes llamar a tu repositorio para actualizar realmente -----
-                // Ejemplo (si tienes un DTO UpdateUserRequest):
-                // val request = UpdateUserRequest(
-                //     username = uiState.username,
-                //     email = uiState.email,
-                //     telefono = uiState.telefono,
-                //     currentPassword = uiState.currentPassword,
-                //     newPassword = if (uiState.newPassword.isBlank()) null else uiState.newPassword
-                // )
-                // val result = userRepository.updateProfile(userId, request)
-                // result.onSuccess { ... }.onFailure { ... }
+            // --- Tarea 1: Actualizar perfil si los datos cambiaron ---
+            if (profileDataChanged) {
+                // --- 👇 ¡EL DTO AHORA SE CREA USANDO LOS NOMBRES CORRECTOS: 'username' y 'email'! 👇 ---
+                val profileRequest = UserUpdateRequest(
+                    currentPassword = uiState.currentPassword,
+                    username = uiState.username.takeIf { usernameChanged },
+                    email = uiState.email.takeIf { emailChanged },
+                    telefono = uiState.telefono.takeIf { telefonoChanged },
+                    newPassword = null // La contraseña se cambia en un endpoint separado
+                )
+                userRepository.updateProfile(userId, profileRequest).onFailure {
+                    somethingFailed = true
+                    uiState = uiState.copy(error = "Error al actualizar perfil: contraseña actual incorrecta o datos inválidos.")
+                }
+            }
 
-                // Como no conocemos tu endpoint exacto, simulamos la llamada:
-                delay(900)
+            // --- Tarea 2: Cambiar contraseña si se proporcionó una nueva (y la Tarea 1 no falló) ---
+            if (passwordChanged && !somethingFailed) {
+                userRepository.changePassword(userId, uiState.currentPassword, uiState.newPassword).onFailure {
+                    somethingFailed = true
+                    uiState = uiState.copy(error = "Error al cambiar la contraseña: contraseña actual incorrecta.")
+                }
+            }
 
-                // Si usas la API real, reemplaza lo anterior por la llamada a userRepository
-                // y maneja onSuccess/onFailure según tu API.
-
-                // Simulamos éxito:
-                uiState = uiState.copy(isUpdating = false, updateSuccess = true, error = null)
-
-            } catch (e: Exception) {
-                uiState = uiState.copy(isUpdating = false, error = "Error al actualizar el perfil.")
+            // --- Resultado Final ---
+            if (somethingFailed) {
+                uiState = uiState.copy(isUpdating = false)
+            } else {
+                originalUsername = uiState.username
+                originalEmail = uiState.email
+                originalTelefono = uiState.telefono
+                uiState = uiState.copy(isUpdating = false, updateSuccess = true)
             }
         }
     }

@@ -1,13 +1,21 @@
 package com.example.aplicacionjetpack.data.dto
 
+import com.google.gson.annotations.SerializedName
+
 /**
- * DTO para la petición de actualizar el perfil de usuario.
- * Coincide con la lógica del backend que espera estos campos.
+ * DTO para enviar actualizaciones parciales de perfil.
+ * Los campos puede ser null para indicar "no cambiar".
+ *
+ * - currentPassword: obligatorio (autorización)
+ * - username/email/telefono/newPassword: opcionales (nullable)
+ *
+ * Nota: usamos @SerializedName para mapear al backend Java que espera
+ * "newUsername" / "newEmail".
  */
 data class UserUpdateRequest(
-    val username: String,
-    val email: String,
-    val telefono: String,
-    val newPassword: String?, // Nulable: si es nulo, el backend no cambia la contraseña
-    val currentPassword: String // Obligatoria para autenticar la petición
+    val currentPassword: String,
+    @SerializedName("newUsername") val username: String? = null,
+    @SerializedName("newEmail") val email: String? = null,
+    val telefono: String? = null,
+    val newPassword: String? = null
 )

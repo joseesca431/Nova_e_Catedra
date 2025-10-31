@@ -43,18 +43,15 @@ fun DetallesPagoScreen(
     val carritoUiState = carritoViewModel.uiState
     val userUiState = userViewModel.uiState
 
-    // --- 👇👇👇 ¡¡¡LA LÓGICA SIMPLIFICADA Y CORRECTA!!! 👇👇👇 ---
-    // Ya NO se crea ningún pedido aquí.
-    // Solo nos aseguramos de que los datos visuales (carrito y usuario) estén cargados.
+    // Cargar carrito (el userViewModel ya carga su estado en init)
     LaunchedEffect(key1 = Unit) {
         carritoViewModel.loadCarrito()
-        // El userViewModel ya se carga en su 'init', no es necesario llamarlo aquí.
     }
-    // --- --------------------------------------------------- ---
 
-    val nombreUsuario = userUiState.user?.username ?: "Cargando..."
-    val correoUsuario = userUiState.user?.email ?: "Cargando..."
-    val telefonoUsuario = userUiState.user?.telefono ?: "No disponible"
+    // Usar los campos del estado del viewmodel (evita referencias a `user`)
+    val nombreUsuario = userUiState.username.ifBlank { "Cargando..." }
+    val correoUsuario = userUiState.email.ifBlank { "Cargando..." }
+    val telefonoUsuario = userUiState.telefono.ifBlank { "No disponible" }
 
     Scaffold(
         topBar = {
@@ -119,10 +116,8 @@ fun DetallesPagoScreen(
                 Text(totalFormatted, style = MaterialTheme.typography.headlineMedium, color = PurpleDark, fontWeight = FontWeight.ExtraBold)
             }
 
-            // --- 👇👇👇 ¡¡¡EL BOTÓN SIMPLIFICADO!!! 👇👇👇 ---
             Button(
                 onClick = { navController.navigate("pago/$idCarrito") },
-                // El botón siempre está habilitado a menos que el carrito esté vacío.
                 enabled = carritoUiState.items.isNotEmpty(),
                 modifier = Modifier
                     .fillMaxWidth()
@@ -132,18 +127,19 @@ fun DetallesPagoScreen(
             ) {
                 Text("Continuar", color = Color.White, fontSize = 16.sp, fontWeight = FontWeight.Bold)
             }
-            // --- -------------------------------------------- ---
         }
     }
 }
 
-// --- Componentes auxiliares (sin cambios) ---
+// --- Funciones auxiliares ---
 
 @Composable
 private fun InfoRow(label: String, value: String) {
-    Column(modifier = Modifier
-        .fillMaxWidth()
-        .padding(bottom = 12.dp)) {
+    Column(
+        modifier = Modifier
+            .fillMaxWidth()
+            .padding(bottom = 12.dp)
+    ) {
         Text(label, style = MaterialTheme.typography.labelSmall, color = Color.Gray)
         Text(value, style = MaterialTheme.typography.bodyLarge, color = Color.Black)
     }

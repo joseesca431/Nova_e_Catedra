@@ -11,22 +11,20 @@ object ValidationUtils {
     // Acepta formato MMYY y comprueba que la fecha no haya pasado
     private val EXPIRY_DATE_PATTERN = Pattern.compile("^(0[1-9]|1[0-2])[0-9]{2}$")
     private val CVV_PATTERN = Pattern.compile("^[0-9]{3,4}$")
-    private val EMAIL_PATTERN = Pattern.compile("[a-zA-Z0-9._-]+@[a-z]+\\.+[a-z]+")
-
-    // --- 👇👇👇 ¡¡¡LÓGICA SIMPLIFICADA Y A PRUEBA DE ERRORES!!! 👇👇👇 ---
+    // Regex de email más robusto (simple y efectivo)
+    private val EMAIL_PATTERN = Pattern.compile("^[A-Za-z0-9+_.-]+@[A-Za-z0-9.-]+\\.[A-Za-z]{2,}$")
+    // Regex para teléfono: acepta dígitos, +, espacios, guiones, paréntesis. Longitud entre 7 y 20.
+    private val PHONE_PATTERN = Pattern.compile("^[0-9+()\\s-]{7,20}$")
 
     fun isValidCardNumber(cardNumber: String): Boolean {
-        // Simple: ¿tiene 16 dígitos?
         return cardNumber.length == 16 && cardNumber.all { it.isDigit() }
     }
 
     fun isValidCvv(cvv: String): Boolean {
-        // Simple: ¿tiene 3 o 4 dígitos?
         return (cvv.length == 3 || cvv.length == 4) && cvv.all { it.isDigit() }
     }
 
     fun isValidCardHolder(holder: String): Boolean {
-        // Simple: ¿tiene más de 2 caracteres después de quitar espacios?
         return holder.trim().length > 2
     }
 
@@ -34,9 +32,11 @@ object ValidationUtils {
         return EMAIL_PATTERN.matcher(email).matches()
     }
 
+    fun isValidPhone(phone: String): Boolean {
+        return PHONE_PATTERN.matcher(phone).matches()
+    }
+
     fun isValidExpiryDate(expiryDate: String): Boolean {
-        // Simple: ¿tiene 4 dígitos? El VisualTransformation ya le da el formato.
-        // La validación real la hará el servidor de pagos.
         return expiryDate.length == 4 && expiryDate.all { it.isDigit() }
     }
 }
