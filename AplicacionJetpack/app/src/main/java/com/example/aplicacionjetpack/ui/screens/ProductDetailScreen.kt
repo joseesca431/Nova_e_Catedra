@@ -50,14 +50,15 @@ fun ProductDetailScreen(
     val uiState by remember { derivedStateOf { viewModel.uiState } }
 
     // Palette (for this screen we force a coherent white + orange look using your palette)
-    val brandPrimary = PurpleDark           // dark text / brand
-    val brandAccent = OrangeAccent          // CTA (naranja)
-    val surfaceWhite = Color(0xFFFFFFFF)    // fondo principal de tarjetas / inputs (blanco)
-    val backgroundSoft = PurpleGrey80       // fondo suave (usar con moderación)
-    val subtleBorder = PurpleGrey40         // borde y outline
-    val starTint = OrangeAccent             // estrellas en naranja
+    val brandPrimary = PurpleDark
+    val brandAccent = OrangeAccent
+    val surfaceWhite = Color(0xFFFFFFFF)
+    val backgroundSoft = PurpleGrey80
+    val subtleBorder = PurpleGrey40
+    val starTint = OrangeAccent
 
     // Local UI state
+    // quantity inicial se ajustará en LaunchedEffect cuando cargue producto (clamped al stock)
     var quantity by rememberSaveable { mutableStateOf(1) }
     var comentarioState by remember { mutableStateOf("") }
     var ratingState by rememberSaveable { mutableStateOf(5.0) }
@@ -79,6 +80,25 @@ fun ProductDetailScreen(
     // Load product when productId changes
     LaunchedEffect(productId) {
         if (productId != 0L) viewModel.loadProductAndReviews(productId)
+    }
+
+    // Cuando cambie el producto, fijamos la cantidad inicial y la limitamos al stock
+    LaunchedEffect(uiState.product?.cantidad) {
+        // uiState.product?.cantidad puede ser Int?, Long?, Double? según tu DTO; lo convertimos a Int seguro
+        val available = uiState.product?.cantidad?.let {
+            try { (it as Number).toInt() } catch (_: Exception) { it.toString().toIntOrNull() ?: 0 }
+        } ?: 0
+
+        // Si stock es 0 dejamos quantity en 0 (para mostrarlo) sino en 1
+        quantity = if (available <= 0) 0 else minOf(1, available)
+    }
+
+    // compute average rating from reviews (safe)
+    val avgRating: Double? = remember(uiState.reviews) {
+        if (uiState.reviews.isNotEmpty()) {
+            val nums = uiState.reviews.map { ratingStringToDouble(it.rating) }
+            nums.average()
+        } else null
     }
 
     Scaffold(
@@ -106,7 +126,6 @@ fun ProductDetailScreen(
             )
         },
         snackbarHost = { SnackbarHost(hostState = snackbarHostState) },
-
         containerColor = backgroundSoft
     ) { innerPadding ->
 
@@ -125,15 +144,37 @@ fun ProductDetailScreen(
             return@Scaffold
         }
 
-        // compute average rating from reviews (safe)
-        val avgRating: Double? = remember(uiState.reviews) {
-            if (uiState.reviews.isNotEmpty()) {
-                val nums = uiState.reviews.map { ratingStringToDouble(it.rating) }
-                nums.average()
-            } else null
+        // ---------- Helper seguro para parsear stock a Int ----------
+        /** Convierte cualquier valor posible de `cantidad` (Number, String, etc.) a Int seguro */
+        fun parseAvailableStock(raw: Any?): Int {
+            if (raw == null) return 0
+            return try {
+                when (raw) {
+                    is Number -> raw.toInt()
+                    is String -> raw.trim().toIntOrNull() ?: 0
+                    else -> 0
+                }
+            } catch (e: Exception) {
+                0
+            }
         }
 
-        // Content
+// ---------- Usar helper para controlar quantity y mostrar stock ----------
+        val availableStock: Int = remember(uiState.product?.cantidad) {
+            parseAvailableStock(uiState.product?.cantidad)
+        }
+
+        LaunchedEffect(availableStock) {
+            quantity = when {
+                availableStock <= 0 -> 0        // agotado -> quantity 0 (deshabilitado)
+                quantity < 1 -> 1               // si por alguna razón era 0 o negativo -> 1
+                quantity > availableStock -> availableStock // no permitir > stock
+                else -> quantity
+            }
+        }
+
+
+
         LazyColumn(
             modifier = Modifier
                 .fillMaxSize()
@@ -187,45 +228,70 @@ fun ProductDetailScreen(
                     colors = CardDefaults.cardColors(containerColor = surfaceWhite)
                 ) {
                     Column(modifier = Modifier.padding(20.dp)) {
-                        Text(
-                            text = uiState.product?.nombre ?: "Nombre del producto",
-                            style = MaterialTheme.typography.headlineSmall,
-                            fontWeight = FontWeight.SemiBold,
-                            color = brandPrimary,
-                            maxLines = 2,
-                            overflow = TextOverflow.Ellipsis
-                        )
+                        Row(verticalAlignment = Alignment.Top, modifier = Modifier.fillMaxWidth()) {
+                            Column(modifier = Modifier.weight(1f)) {
+                                Text(
+                                    text = uiState.product?.nombre ?: "Nombre del producto",
+                                    style = MaterialTheme.typography.headlineSmall,
+                                    fontWeight = FontWeight.SemiBold,
+                                    color = brandPrimary,
+                                    maxLines = 2,
+                                    overflow = TextOverflow.Ellipsis
+                                )
 
-                        Spacer(Modifier.height(8.dp))
+                                Spacer(Modifier.height(8.dp))
 
-                        // Price + rating row
-                        Row(
-                            verticalAlignment = Alignment.CenterVertically,
-                            modifier = Modifier.fillMaxWidth()
-                        ) {
-                            val priceText = uiState.product?.precio?.let { precio ->
-                                try {
-                                    NumberFormat.getCurrencyInstance(Locale.getDefault()).format(precio)
-                                } catch (_: Exception) {
-                                    "$${uiState.product?.precio ?: BigDecimal.ZERO}"
+                                // Price + rating row
+                                Row(
+                                    verticalAlignment = Alignment.CenterVertically,
+                                    modifier = Modifier.fillMaxWidth()
+                                ) {
+                                    val priceText = uiState.product?.precio?.let { precio ->
+                                        try {
+                                            NumberFormat.getCurrencyInstance(Locale.getDefault()).format(precio)
+                                        } catch (_: Exception) {
+                                            "$${uiState.product?.precio ?: BigDecimal.ZERO}"
+                                        }
+                                    } ?: "$0.00"
+
+                                    Text(
+                                        text = priceText,
+                                        style = MaterialTheme.typography.headlineMedium,
+                                        color = brandAccent,
+                                        fontWeight = FontWeight.ExtraBold
+                                    )
+
+                                    Spacer(Modifier.weight(1f))
+
+                                    RatingSummary(
+                                        ratingValue = avgRating,
+                                        reviewsCount = uiState.reviews.size,
+                                        starColor = starTint,
+                                        textColor = brandPrimary
+                                    )
                                 }
-                            } ?: "$0.00"
 
-                            Text(
-                                text = priceText,
-                                style = MaterialTheme.typography.headlineMedium,
-                                color = brandAccent,
-                                fontWeight = FontWeight.ExtraBold
-                            )
+                                Spacer(Modifier.height(12.dp))
 
-                            Spacer(Modifier.weight(1f))
-
-                            RatingSummary(
-                                ratingValue = avgRating,
-                                reviewsCount = uiState.reviews.size,
-                                starColor = starTint,
-                                textColor = brandPrimary
-                            )
+                                // Stock line
+                                Row(verticalAlignment = Alignment.CenterVertically) {
+                                    if (availableStock <= 0) {
+                                        // Agotado badge
+                                        Box(
+                                            modifier = Modifier
+                                                .clip(RoundedCornerShape(8.dp))
+                                                .background(Color(0xFFFF6B6B))
+                                                .padding(horizontal = 8.dp, vertical = 4.dp)
+                                        ) {
+                                            Text("AGOTADO", color = Color.White, fontWeight = FontWeight.Bold, fontSize = 12.sp)
+                                        }
+                                        Spacer(Modifier.width(8.dp))
+                                        Text("Stock: 0", color = brandPrimary.copy(alpha = 0.8f))
+                                    } else {
+                                        Text("Stock: $availableStock", color = brandPrimary.copy(alpha = 0.85f))
+                                    }
+                                }
+                            }
                         }
 
                         Spacer(Modifier.height(12.dp))
@@ -273,8 +339,15 @@ fun ProductDetailScreen(
                                     modifier = Modifier.padding(4.dp)
                                 ) {
                                     IconButton(
-                                        onClick = { if (quantity > 1) quantity-- },
-                                        modifier = Modifier.size(40.dp)
+                                        onClick = {
+                                            if (availableStock <= 0) {
+                                                quantity = 0
+                                            } else {
+                                                if (quantity > 1) quantity--
+                                            }
+                                        },
+                                        modifier = Modifier.size(40.dp),
+                                        enabled = availableStock > 0 && quantity > 0
                                     ) {
                                         Icon(Icons.Default.Remove, contentDescription = "Disminuir", tint = brandPrimary)
                                     }
@@ -288,8 +361,15 @@ fun ProductDetailScreen(
                                     )
 
                                     IconButton(
-                                        onClick = { quantity++ },
-                                        modifier = Modifier.size(40.dp)
+                                        onClick = {
+                                            // increment pero no más que el stock
+                                            if (availableStock > 0) {
+                                                if (quantity < availableStock) quantity++ // cap
+                                                else quantity = availableStock
+                                            }
+                                        },
+                                        modifier = Modifier.size(40.dp),
+                                        enabled = availableStock > 0 && quantity < availableStock
                                     ) {
                                         Icon(Icons.Default.Add, contentDescription = "Aumentar", tint = brandPrimary)
                                     }
@@ -298,19 +378,29 @@ fun ProductDetailScreen(
 
                             Spacer(Modifier.width(12.dp))
 
-                            // Add button (naranja)
+                            // Add button (naranja) - deshabilitado si agotado o cantidad inválida
                             Button(
-                                onClick = { carritoViewModel.addItem(productId, quantity) },
+                                onClick = {
+                                    val qtyToAdd = if (availableStock <= 0) 0 else minOf(quantity.coerceAtLeast(1), availableStock)
+                                    if (qtyToAdd > 0) carritoViewModel.addItem(productId, qtyToAdd)
+                                },
                                 modifier = Modifier
                                     .height(50.dp)
                                     .fillMaxWidth(),
                                 shape = RoundedCornerShape(10.dp),
-                                colors = ButtonDefaults.buttonColors(containerColor = brandAccent, contentColor = surfaceWhite)
+                                colors = ButtonDefaults.buttonColors(
+                                    containerColor = if (availableStock <= 0) Color.LightGray else brandAccent,
+                                    contentColor = surfaceWhite
+                                ),
+                                enabled = availableStock > 0 && quantity > 0
                             ) {
                                 Row(verticalAlignment = Alignment.CenterVertically) {
                                     Icon(Icons.Default.ShoppingCart, contentDescription = null, tint = surfaceWhite)
                                     Spacer(Modifier.width(8.dp))
-                                    Text("Agregar al carrito", color = surfaceWhite)
+                                    Text(
+                                        text = if (availableStock <= 0) "No disponible" else "Agregar al carrito",
+                                        color = surfaceWhite
+                                    )
                                 }
                             }
                         }
@@ -318,7 +408,7 @@ fun ProductDetailScreen(
                 }
             }
 
-            // Reviews header
+            // Reviews header, add review card and reviews list remain the same...
             item {
                 Column(modifier = Modifier.padding(horizontal = 16.dp, vertical = 10.dp)) {
                     Text("Reseñas", style = MaterialTheme.typography.titleMedium, color = brandPrimary)
@@ -333,7 +423,7 @@ fun ProductDetailScreen(
                 }
             }
 
-            // Add review card (blanco con borde sutil)
+            // Add review card (unchanged) ...
             item {
                 Card(
                     modifier = Modifier
@@ -353,7 +443,6 @@ fun ProductDetailScreen(
                         )
                         Spacer(Modifier.height(8.dp))
 
-                        // OutlinedTextField con fondo blanco y borde naranja al focus
                         OutlinedTextField(
                             value = comentarioState,
                             onValueChange = { comentarioState = it },
@@ -371,7 +460,6 @@ fun ProductDetailScreen(
                                 focusedTextColor = brandPrimary,
                                 unfocusedTextColor = brandPrimary.copy(alpha = 0.9f),
                                 cursorColor = brandAccent,
-
                             ),
                             shape = RoundedCornerShape(10.dp)
                         )
@@ -400,7 +488,7 @@ fun ProductDetailScreen(
                 }
             }
 
-            // Reviews list
+            // Reviews list (unchanged) ...
             items(uiState.reviews, key = { it.idResena }) { r ->
                 Column(
                     modifier = Modifier
@@ -429,7 +517,7 @@ fun ProductDetailScreen(
                 }
             }
 
-            // Pagination footer
+            // Pagination footer (unchanged) ...
             item {
                 Spacer(modifier = Modifier.height(12.dp))
                 when {
@@ -461,6 +549,7 @@ fun ProductDetailScreen(
         } // LazyColumn end
     } // Scaffold end
 }
+
 
 /** Compact rating summary shown near price */
 @Composable

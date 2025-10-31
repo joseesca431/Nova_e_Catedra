@@ -295,54 +295,91 @@ class CheckoutViewModel @Inject constructor(
     // ------------------ Checkout / Pago ------------------
 
     fun processFinalCheckout(idCarrito: Long) {
-        // Validación del alias y dirección
-        val isNewAddress = uiState.usarDireccionExistenteId == null
-        if (!isAddressValid || (isNewAddress && uiState.aliasDireccion.isBlank())) {
-            uiState = uiState.copy(error = "La dirección (y el alias si es nueva) no es válida.")
+        val userId = AuthManager.userId
+        if (userId == null) {
+            uiState = uiState.copy(error = "Sesión no válida. Por favor, inicie sesión de nuevo.")
             return
         }
 
+        if (!isAddressValid) {
+            uiState = uiState.copy(error = "La dirección seleccionada no es válida.")
+            return
+        }
         if (!isPaymentValid) {
-            uiState = uiState.copy(error = "Los datos del método de pago son inválidos.")
+            uiState = uiState.copy(error = "Los detalles del método de pago no son válidos.")
             return
         }
 
         viewModelScope.launch {
             uiState = uiState.copy(isLoading = true, error = null)
-            val userId = AuthManager.userId ?: run {
-                handleError("Error fatal: Usuario no autenticado.")
-                return@launch
-            }
-            val idDireccionFinal = getFinalDireccionId(userId).getOrElse {
-                handleError("No se pudo procesar la dirección: ${it.message}")
-                return@launch
-            }
 
-            val pedidoRequest = PedidoRequest(
-                idCarrito = idCarrito,
-                tipoPago = uiState.metodoPagoSeleccionado.name,
-                cuponCodigo = uiState.appliedCouponCode, // <-- ahora mandamos el cupón si existe
-                idDireccion = idDireccionFinal
-            )
+            // --- 👇👇👇 ¡¡¡LA LÓGICA DE LA VICTORIA ESTÁ AQUÍ!!! 👇👇👇 ---
 
-            val checkoutResult = pedidoRepository.checkout(pedidoRequest)
-            checkoutResult.onSuccess { pedidoCreado ->
-                // Armar pagoRequest incluyendo detalles de pago (añadimos shippingCost y couponDiscount en detalles)
-                val pagoRequest = PagoRequest(
-                    detallesPago = buildPaymentDetailsJson(),
-                    usuario = UserRequest(idUser = userId)
+            // 1. Determinar el ID de la dirección a usar.
+            // Si no hay una dirección existente seleccionada, el backend creará una nueva.
+            // El backend necesita el ID de la dirección para asociarlo al pedido.
+            val idDireccionParaPedido = uiState.usarDireccionExistenteId
+            if (idDireccionParaPedido == null) {
+                // LÓGICA PARA CREAR LA DIRECCIÓN PRIMERO
+                // Si el usuario marcó una nueva dirección en el mapa, la creamos primero
+                val direccionRequest = DireccionRequest(
+                    alias = uiState.aliasDireccion,
+                    calle = uiState.direccion,
+                    ciudad = uiState.municipio,
+                    departamento = uiState.departamento,
+                    latitud = uiState.latitud,
+                    longitud = uiState.longitud
                 )
-                val pagarResult = pedidoRepository.pagar(pedidoCreado.idPedido, pagoRequest)
-                pagarResult.onSuccess {
-                    uiState = uiState.copy(isLoading = false, checkoutSuccess = true)
+                val direccionResult = direccionRepository.createDireccion(userId, direccionRequest)
+
+                direccionResult.onSuccess { nuevaDireccion ->
+                    // Una vez creada, procedemos a crear el pedido con el ID de la nueva dirección
+                    procederConCreacionDePedido(idCarrito, nuevaDireccion.idDireccion)
                 }.onFailure { e ->
-                    handleError("El pago no pudo ser procesado: ${e.message}")
+                    Log.e(TAG, "Error creando la nueva dirección antes del checkout", e)
+                    uiState = uiState.copy(isLoading = false, error = "No se pudo guardar la nueva dirección.")
                 }
-            }.onFailure { e ->
-                handleError("No se pudo iniciar el pedido: ${e.message}")
+            } else {
+                // Si ya teníamos un ID de dirección existente, procedemos directamente.
+                procederConCreacionDePedido(idCarrito, idDireccionParaPedido)
             }
         }
     }
+
+    // --- Función auxiliar para no repetir código ---
+    // ... dentro de CheckoutViewModel.kt
+
+    // --- Función auxiliar para no repetir código ---
+    private fun procederConCreacionDePedido(idCarrito: Long, idDireccion: Long) {
+        viewModelScope.launch { // Necesita su propio scope
+            // 1. Crear el PedidoRequest, incluyendo el cupón.
+            val pedidoRequest = PedidoRequest(
+                idCarrito = idCarrito,
+                tipoPago = uiState.metodoPagoSeleccionado.name,
+                idDireccion = idDireccion,
+                cuponCodigo = uiState.appliedCouponCode // ¡El cupón sigue aquí!
+            )
+
+            // --- 👇👇👇 ¡EL CAMBIO DE LA VICTORIA! 👇👇👇 ---
+            // 2. Llamar al repositorio con la función correcta.
+            // Ya no se usa createAndPayOrder ni se envía un PagoRequest aquí.
+            val result = pedidoRepository.checkout(pedidoRequest)
+
+            result.onSuccess {
+                Log.d(TAG, "Checkout completo exitoso. Pedido creado.")
+                // Tu backend ya cambió el estado del carrito a PAGADO,
+                // así que el checkout está funcionalmente completo.
+                uiState = uiState.copy(isLoading = false, checkoutSuccess = true, error = null)
+            }.onFailure { exception ->
+                Log.e(TAG, "Fallo en el checkout final", exception)
+                val errorMessage = exception.message ?: "Error desconocido"
+                // Ahora mostramos el error que viene del backend si la petición es rechazada
+                uiState = uiState.copy(isLoading = false, error = "Error al procesar el pedido: $errorMessage")
+            }
+            // --- -------------------------------------------- ---
+        }
+    }
+
 
     /**
      * Build JSON con los detalles de pago + shipping & coupon (si existen).
