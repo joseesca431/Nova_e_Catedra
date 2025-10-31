@@ -1,6 +1,8 @@
 package com.example.adminappnova.ui.screens
 
 import android.util.Log
+import androidx.compose.animation.animateColorAsState
+import androidx.compose.animation.core.tween
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
@@ -9,14 +11,14 @@ import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
-// --- 👇¡¡¡LAS IMPORTACIONES CORRECTAS DE LA VICTORIA!!!👇 ---
 import androidx.compose.material.icons.filled.ArrowDropDown
 import androidx.compose.material.icons.filled.ArrowDropUp
-// -------------------------------------------------------------
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
+import androidx.compose.ui.draw.shadow
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.text.font.FontWeight
@@ -48,142 +50,190 @@ fun PedidosScreen(
 
     Scaffold(
         bottomBar = {
-            NavigationBar(containerColor = Color.White, tonalElevation = 8.dp) {
-                NavigationBarItem(
-                    selected = selectedTab == "Home",
-                    onClick = {
-                        selectedTab = "Home"
-                        navController.navigate("start") { popUpTo("start") { inclusive = false }; launchSingleTop = true }
-                    },
-                    icon = { Icon(painterResource(id = R.drawable.ic_home), "Home", Modifier.size(24.dp)) },
-                    label = { Text("Home", fontSize = 10.sp) },
-                    colors = NavigationBarItemDefaults.colors(selectedIconColor = Color(0xFF2D1B4E), selectedTextColor = Color(0xFF2D1B4E), indicatorColor = Color.Transparent, unselectedIconColor = Color.Gray, unselectedTextColor = Color.Gray)
-                )
-                NavigationBarItem(
-                    selected = selectedTab == "Categorías",
-                    onClick = {
-                        selectedTab = "Categorías"
-                        navController.navigate("categories") { popUpTo("start") { inclusive = false }; launchSingleTop = true }
-                    },
-                    icon = { Icon(painterResource(id = R.drawable.ic_categorias), "Categorías", Modifier.size(24.dp)) },
-                    label = { Text("Categorías", fontSize = 10.sp) },
-                    colors = NavigationBarItemDefaults.colors(selectedIconColor = Color(0xFF2D1B4E), selectedTextColor = Color(0xFF2D1B4E), indicatorColor = Color.Transparent, unselectedIconColor = Color.Gray, unselectedTextColor = Color.Gray)
-                )
-                NavigationBarItem(
-                    selected = selectedTab == "Pedidos",
-                    onClick = { selectedTab = "Pedidos" },
-                    icon = { Icon(painterResource(id = R.drawable.ic_pedido), "Pedidos", Modifier.size(24.dp)) },
-                    label = { Text("Pedidos", fontSize = 10.sp) },
-                    colors = NavigationBarItemDefaults.colors(selectedIconColor = Color(0xFF2D1B4E), selectedTextColor = Color(0xFF2D1B4E), indicatorColor = Color.Transparent, unselectedIconColor = Color.Gray, unselectedTextColor = Color.Gray)
-                )
-            }
+            ModernNavigationBar(
+                selectedTab = selectedTab,
+                onTabSelected = { tab ->
+                    selectedTab = tab
+                    when (tab) {
+                        "Home" -> navController.navigate("start") {
+                            popUpTo("start") { inclusive = false }
+                            launchSingleTop = true
+                        }
+                        "Categorías" -> navController.navigate("categories") {
+                            popUpTo("start") { inclusive = false }
+                            launchSingleTop = true
+                        }
+                    }
+                }
+            )
         }
     ) { paddingValues ->
         Column(
             modifier = Modifier
                 .fillMaxSize()
-                .background(Color(0xFFF5F5F5))
-                .padding(paddingValues),
+                .background(Color(0xFFF8F9FA))
+                .padding(paddingValues)
+                .padding(horizontal = 20.dp),
             horizontalAlignment = Alignment.CenterHorizontally
         ) {
+            Spacer(modifier = Modifier.height(24.dp))
+
             Text(
                 text = "Administración de Pedidos",
-                fontSize = 20.sp,
-                color = Color(0xFFFF6B35),
+                fontSize = 24.sp,
+                color = Color(0xFF2D1B4E),
                 fontWeight = FontWeight.Bold,
-                modifier = Modifier.padding(top = 16.dp)
+                letterSpacing = 0.5.sp
             )
 
-            Spacer(modifier = Modifier.height(16.dp))
-            Box(modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp)) {
+            Spacer(modifier = Modifier.height(24.dp))
+
+            // Dropdown moderno
+            Box(modifier = Modifier.fillMaxWidth()) {
                 ExposedDropdownMenuBox(
                     expanded = isDropdownExpanded,
-                    onExpandedChange = { isDropdownExpanded = it },
-                    modifier = Modifier.fillMaxWidth()
+                    onExpandedChange = { isDropdownExpanded = it }
                 ) {
                     OutlinedTextField(
                         value = estadoToString(uiState.filtroEstado),
                         onValueChange = {},
                         readOnly = true,
-                        label = { Text("Filtrar por estado") },
-                        // --- 👇 ¡ICONOS CORREGIDOS! 👇 ---
-                        trailingIcon = { Icon(if (isDropdownExpanded) Icons.Filled.ArrowDropUp else Icons.Filled.ArrowDropDown, "Abrir/Cerrar menú") },
+                        label = {
+                            Text(
+                                "Filtrar por estado",
+                                color = Color(0xFF757575)
+                            )
+                        },
+                        trailingIcon = {
+                            Icon(
+                                if (isDropdownExpanded) Icons.Filled.ArrowDropUp else Icons.Filled.ArrowDropDown,
+                                contentDescription = "Abrir/Cerrar menú",
+                                tint = Color(0xFF2D1B4E)
+                            )
+                        },
                         colors = OutlinedTextFieldDefaults.colors(
-                            focusedContainerColor = Color.White,
-                            unfocusedContainerColor = Color.White,
-                            disabledContainerColor = Color.White,
                             focusedBorderColor = Color(0xFF2D1B4E),
-                            unfocusedBorderColor = Color.Gray
+                            unfocusedBorderColor = Color(0xFFE0E0E0),
+                            focusedLabelColor = Color(0xFF2D1B4E),
+                            unfocusedLabelColor = Color(0xFF757575)
                         ),
-                        // --- 👇 ¡MODIFICADOR CORREGIDO! 👇 ---
-                        modifier = Modifier.menuAnchor().fillMaxWidth()
+                        shape = RoundedCornerShape(12.dp),
+                        modifier = Modifier
+                            .menuAnchor()
+                            .fillMaxWidth()
                     )
                     ExposedDropdownMenu(
                         expanded = isDropdownExpanded,
                         onDismissRequest = { isDropdownExpanded = false },
-                        modifier = Modifier.fillMaxWidth()
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .background(Color.White)
+                            .shadow(4.dp, shape = RoundedCornerShape(12.dp))
                     ) {
                         filterOptions.forEach { estado ->
                             DropdownMenuItem(
-                                text = { Text(estadoToString(estado)) },
+                                text = {
+                                    Text(
+                                        text = estadoToString(estado),
+                                        color = if (uiState.filtroEstado == estado) Color(0xFF2D1B4E) else Color.Black,
+                                        fontWeight = if (uiState.filtroEstado == estado) FontWeight.SemiBold else FontWeight.Normal
+                                    )
+                                },
                                 onClick = {
                                     onChangeFilter(estado)
                                     isDropdownExpanded = false
                                 },
-                                colors = if (uiState.filtroEstado == estado) MenuDefaults.itemColors(textColor = Color(0xFF2D1B4E)) else MenuDefaults.itemColors()
+                                modifier = Modifier.fillMaxWidth()
                             )
                         }
                     }
                 }
             }
-            Spacer(modifier = Modifier.height(16.dp))
+
+            Spacer(modifier = Modifier.height(24.dp))
 
             val swipeRefreshState = rememberSwipeRefreshState(isRefreshing = uiState.isLoading && uiState.pedidosFiltrados.isNotEmpty())
             SwipeRefresh(
                 state = swipeRefreshState,
                 onRefresh = onRefresh,
-                modifier = Modifier.weight(1f).padding(horizontal = 16.dp)
+                modifier = Modifier.weight(1f)
             ) {
                 Box(modifier = Modifier.fillMaxSize()) {
                     if (uiState.isLoading && uiState.pedidosFiltrados.isEmpty()) {
-                        CircularProgressIndicator(modifier = Modifier.align(Alignment.Center))
+                        Column(
+                            modifier = Modifier.fillMaxSize(),
+                            horizontalAlignment = Alignment.CenterHorizontally,
+                            verticalArrangement = Arrangement.Center
+                        ) {
+                            CircularProgressIndicator(color = Color(0xFF2D1B4E))
+                            Spacer(modifier = Modifier.height(12.dp))
+                            Text("Cargando pedidos...", color = Color.Gray)
+                        }
                     } else if (uiState.pedidosFiltrados.isEmpty() && uiState.error == null && !uiState.isLoading) {
-                        Text(
-                            text = if (uiState.filtroEstado == null) "No hay pedidos." else "No hay pedidos con estado '${estadoToString(uiState.filtroEstado)}'.",
-                            modifier = Modifier.align(Alignment.Center).padding(horizontal = 16.dp),
-                            textAlign = TextAlign.Center, color = Color.Gray
-                        )
+                        Column(
+                            modifier = Modifier.fillMaxSize(),
+                            horizontalAlignment = Alignment.CenterHorizontally,
+                            verticalArrangement = Arrangement.Center
+                        ) {
+                            Icon(
+                                painter = painterResource(id = R.drawable.ic_pedido),
+                                contentDescription = null,
+                                tint = Color(0xFFE0E0E0),
+                                modifier = Modifier.size(80.dp)
+                            )
+                            Spacer(modifier = Modifier.height(16.dp))
+                            Text(
+                                text = if (uiState.filtroEstado == null) "No hay pedidos aún." else "No hay pedidos con estado '${estadoToString(uiState.filtroEstado)}'.",
+                                textAlign = TextAlign.Center,
+                                color = Color.Gray,
+                                fontSize = 16.sp
+                            )
+                        }
                     } else {
                         LazyColumn(
                             state = listState,
-                            modifier = Modifier.fillMaxSize(),
-                            contentPadding = PaddingValues(bottom = if (uiState.isLoadingMore || !uiState.canLoadMore) 40.dp else 16.dp),
-                            verticalArrangement = Arrangement.spacedBy(12.dp)
+                            verticalArrangement = Arrangement.spacedBy(16.dp),
+                            contentPadding = PaddingValues(bottom = 80.dp)
                         ) {
                             items(uiState.pedidosFiltrados, key = { it.idPedido }) { pedido ->
-                                PedidoCard(
-                                    pedido = pedido,
-                                    onClick = {
-                                        if (pedido.idUser != null) {
-                                            navController.navigate("detalles_pago/${pedido.idPedido}/${pedido.idUser}")
-                                        } else {
-                                            Log.e("PedidosScreen", "CRÍTICO: idUser es nulo para el pedido ${pedido.idPedido}. No se puede navegar.")
-                                        }
+                                PedidoCard(pedido = pedido) {
+                                    if (pedido.idUser != null) {
+                                        navController.navigate("detalles_pago/${pedido.idPedido}/${pedido.idUser}")
+                                    } else {
+                                        Log.e("PedidosScreen", "CRÍTICO: idUser es nulo para el pedido ${pedido.idPedido}.")
                                     }
-                                )
+                                }
                             }
                             item {
                                 if (uiState.isLoadingMore) {
-                                    Row(Modifier.fillMaxWidth().padding(vertical = 8.dp), Arrangement.Center) { CircularProgressIndicator(Modifier.size(24.dp)) }
+                                    Row(
+                                        modifier = Modifier.fillMaxWidth().padding(vertical = 12.dp),
+                                        horizontalArrangement = Arrangement.Center
+                                    ) {
+                                        CircularProgressIndicator(
+                                            modifier = Modifier.size(24.dp),
+                                            color = Color(0xFF2D1B4E)
+                                        )
+                                    }
                                 } else if (!uiState.canLoadMore && uiState.pedidosFiltrados.isNotEmpty()) {
-                                    Text("Fin de la lista", Modifier.fillMaxWidth().padding(vertical = 8.dp), textAlign = TextAlign.Center, color = Color.Gray, fontSize = 12.sp)
+                                    Text(
+                                        "Fin de la lista",
+                                        modifier = Modifier
+                                            .fillMaxWidth()
+                                            .padding(vertical = 12.dp),
+                                        textAlign = TextAlign.Center,
+                                        color = Color.Gray,
+                                        fontSize = 13.sp
+                                    )
                                 }
                             }
                         }
+
+                        // Cargar más al llegar al final
                         val endOfListReached by remember {
                             derivedStateOf {
-                                val lastVisibleItem = listState.layoutInfo.visibleItemsInfo.lastOrNull()
-                                lastVisibleItem != null && lastVisibleItem.index >= listState.layoutInfo.totalItemsCount - 6
+                                val lastVisible = listState.layoutInfo.visibleItemsInfo.lastOrNull()
+                                lastVisible != null && lastVisible.index >= listState.layoutInfo.totalItemsCount - 5
                             }
                         }
                         LaunchedEffect(endOfListReached) {
@@ -193,21 +243,195 @@ fun PedidosScreen(
                         }
                     }
 
+                    // Error moderno
                     uiState.error?.let { error ->
-                        Snackbar(Modifier.align(Alignment.BottomCenter).padding(16.dp), action = { Button(onClick = onRefresh) { Text("Reintentar") } }) { Text(text = error) }
+                        Box(modifier = Modifier.align(Alignment.BottomCenter).padding(16.dp)) {
+                            ErrorCard(error = error)
+                        }
                     }
                 }
+            }
+
+            Spacer(modifier = Modifier.height(16.dp))
+        }
+    }
+}
+
+// ============ COMPONENTES MODERNOS ============
+
+@Composable
+fun PedidoCard(pedido: PedidoResponse, onClick: () -> Unit) {
+    Card(
+        modifier = Modifier
+            .fillMaxWidth()
+            .height(120.dp)
+            .clickable(onClick = onClick),
+        shape = RoundedCornerShape(20.dp),
+        colors = CardDefaults.cardColors(containerColor = Color.White),
+        elevation = CardDefaults.cardElevation(defaultElevation = 0.dp)
+    ) {
+        Column(
+            modifier = Modifier
+                .fillMaxSize()
+                .padding(20.dp),
+            verticalArrangement = Arrangement.SpaceBetween
+        ) {
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.SpaceBetween,
+                verticalAlignment = Alignment.Top
+            ) {
+                Column {
+                    Text(
+                        text = "Pedido #${pedido.idPedido}",
+                        fontSize = 16.sp,
+                        fontWeight = FontWeight.Bold,
+                        color = Color(0xFF2D1B4E)
+                    )
+                    Spacer(modifier = Modifier.height(4.dp))
+                    Text(
+                        text = "Cliente ID: ${pedido.idUser ?: "N/A"}",
+                        fontSize = 13.sp,
+                        color = Color.Gray
+                    )
+                }
+                Text(
+                    text = pedido.fechaInicio.substringBefore('T'),
+                    fontSize = 12.sp,
+                    color = Color(0xFF757575)
+                )
+            }
+
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.SpaceBetween,
+                verticalAlignment = Alignment.Bottom
+            ) {
+                Surface(
+                    shape = RoundedCornerShape(12.dp),
+                    color = estadoColor(pedido.estado).copy(alpha = 0.1f)
+                ) {
+                    Text(
+                        text = pedido.estado?.name?.replace("_", " ")?.lowercase()?.replaceFirstChar { it.uppercase() } ?: "N/A",
+                        fontSize = 12.sp,
+                        color = estadoColor(pedido.estado),
+                        fontWeight = FontWeight.Medium,
+                        modifier = Modifier.padding(horizontal = 10.dp, vertical = 4.dp)
+                    )
+                }
+                Text(
+                    text = "$${pedido.total?.let { "%.2f".format(it) } ?: "0.00"}",
+                    fontSize = 20.sp,
+                    fontWeight = FontWeight.Bold,
+                    color = Color(0xFF2D1B4E)
+                )
             }
         }
     }
 }
 
-// El resto del archivo (PedidoCard, estadoColor, estadoToString) no necesita cambios
-// ... (resto del archivo)
-fun estadoColor(estado: EstadoPedido?): Color {
-    val name = estado?.name?.uppercase(Locale.getDefault()) ?: ""
-    return when (name) {
-        "CARRITO" -> Color(0xFF78909C)
+@Composable
+private fun ErrorCard(error: String) {
+    Card(
+        modifier = Modifier.fillMaxWidth(),
+        shape = RoundedCornerShape(12.dp),
+        colors = CardDefaults.cardColors(containerColor = Color(0xFFFFEBEE))
+    ) {
+        Row(
+            modifier = Modifier.padding(16.dp),
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            Text("⚠️", fontSize = 20.sp, modifier = Modifier.padding(end = 12.dp))
+            Text(
+                text = error,
+                color = Color(0xFFC62828),
+                fontSize = 14.sp,
+                fontWeight = FontWeight.Medium
+            )
+        }
+    }
+}
+
+// ============ MODERN NAVIGATION BAR (igual que en HomeScreen) ============
+
+@Composable
+private fun ModernNavigationBar(
+    selectedTab: String,
+    onTabSelected: (String) -> Unit
+) {
+    Surface(
+        modifier = Modifier
+            .fillMaxWidth()
+            .shadow(8.dp),
+        color = Color.White
+    ) {
+        Row(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(vertical = 8.dp, horizontal = 16.dp),
+            horizontalArrangement = Arrangement.SpaceEvenly
+        ) {
+            listOf(
+                Triple("Home", R.drawable.ic_home, "Home"),
+                Triple("Categorías", R.drawable.ic_categorias, "Categorías"),
+                Triple("Pedidos", R.drawable.ic_pedido, "Pedidos")
+            ).forEach { (label, icon, tab) ->
+                ModernNavItem(
+                    label = label,
+                    icon = icon,
+                    selected = selectedTab == tab,
+                    onClick = { onTabSelected(tab) }
+                )
+            }
+        }
+    }
+}
+
+@Composable
+private fun ModernNavItem(
+    label: String,
+    icon: Int,
+    selected: Boolean,
+    onClick: () -> Unit
+) {
+    val animatedColor by animateColorAsState(
+        targetValue = if (selected) Color(0xFF2D1B4E) else Color.Gray,
+        animationSpec = tween(300)
+    )
+
+    Column(
+        modifier = Modifier
+            .clip(RoundedCornerShape(12.dp))
+            .background(
+                if (selected) Color(0xFFF5F0FF) else Color.Transparent
+            )
+            .padding(horizontal = 16.dp, vertical = 8.dp),
+        horizontalAlignment = Alignment.CenterHorizontally
+    ) {
+        IconButton(
+            onClick = onClick,
+            modifier = Modifier.size(32.dp)
+        ) {
+            Icon(
+                painter = painterResource(id = icon),
+                contentDescription = label,
+                tint = animatedColor,
+                modifier = Modifier.size(24.dp)
+            )
+        }
+        Text(
+            text = label,
+            fontSize = 11.sp,
+            color = animatedColor,
+            fontWeight = if (selected) FontWeight.SemiBold else FontWeight.Normal
+        )
+    }
+}
+
+// ============ UTILS ============
+
+private fun estadoColor(estado: EstadoPedido?): Color {
+    return when (estado?.name?.uppercase(Locale.getDefault())) {
         "PENDIENTE" -> Color(0xFFFFA726)
         "PAGADO" -> Color(0xFF66BB6A)
         "EN_PROCESO", "ENPROCESO", "EN PROCESO" -> Color(0xFFAB47BC)
@@ -217,29 +441,11 @@ fun estadoColor(estado: EstadoPedido?): Color {
         else -> Color.Gray
     }
 }
-@Composable
-fun PedidoCard(pedido: PedidoResponse, onClick: () -> Unit) {
-    Card(
-        modifier = Modifier.fillMaxWidth().height(110.dp).clickable(onClick = onClick),
-        shape = RoundedCornerShape(12.dp),
-        colors = CardDefaults.cardColors(containerColor = Color(0xFF2D1B4E)),
-        elevation = CardDefaults.cardElevation(defaultElevation = 4.dp)
-    ) {
-        Column(Modifier.fillMaxSize().padding(16.dp), Arrangement.SpaceBetween) {
-            Row(Modifier.fillMaxWidth(), Arrangement.SpaceBetween, Alignment.Top) {
-                Text("Pedido #${pedido.idPedido}", fontSize = 14.sp, color = Color.White, fontWeight = FontWeight.Bold)
-                Text(pedido.fechaInicio.substringBefore('T'), fontSize = 10.sp, color = Color.LightGray)
-            }
-            Text("Cliente ID: ${pedido.idUser ?: "N/A"}", fontSize = 12.sp, color = Color.White, fontWeight = FontWeight.Normal)
-            Row(Modifier.fillMaxWidth(), Arrangement.SpaceBetween, Alignment.Bottom) {
-                Text(pedido.estado?.name ?: "N/A", fontSize = 12.sp, color = estadoColor(pedido.estado), fontWeight = FontWeight.Medium)
-                Text("$${pedido.total?.let { "%.2f".format(it) } ?: "0.00"}", fontSize = 20.sp, color = Color.White, fontWeight = FontWeight.Bold)
-            }
-        }
-    }
-}
-
 
 private fun estadoToString(estado: EstadoPedido?): String {
-    return estado?.name?.replace("_", " ")?.lowercase()?.replaceFirstChar { if (it.isLowerCase()) it.titlecase() else it.toString() } ?: "Todos"
+    return estado?.name
+        ?.replace("_", " ")
+        ?.lowercase()
+        ?.replaceFirstChar { it.titlecase() }
+        ?: "Todos"
 }

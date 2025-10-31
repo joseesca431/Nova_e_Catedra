@@ -1,274 +1,329 @@
 package com.example.adminappnova.ui.screens
 
+import androidx.compose.animation.animateColorAsState
+import androidx.compose.animation.core.tween
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
-import androidx.compose.foundation.lazy.items // 👈 Importar items correcto
+import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.Add
+import androidx.compose.material.icons.filled.Category
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
+import androidx.compose.ui.draw.shadow
+import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.text.font.FontWeight
-import androidx.compose.ui.text.style.TextAlign // <-- Asegúrate de tener este import
+import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.navigation.NavController
 import com.example.adminappnova.R
-import com.example.adminappnova.data.dto.CategoryResponse // 👈 Importar DTO
-import com.example.adminappnova.ui.viewmodel.CategoriesUiState // 👈 Importar UiState
+import com.example.adminappnova.data.dto.CategoryResponse
+import com.example.adminappnova.ui.viewmodel.CategoriesUiState
 
 @Composable
 fun CategoriesScreen(
     navController: NavController,
-    uiState: CategoriesUiState, // 👈 Recibe estado del ViewModel
-    onAddCategoryClick: () -> Unit, // 👈 Evento para FAB del ViewModel
-    // Eventos para el diálogo desde el ViewModel
-    onDismissAddDialog: () -> Unit,
-    // El nombre del parámetro aquí puede ser 'onNewCategoryNameChange', pero llama a la función correcta del VM
-    onNewCategoryNameChange: (String) -> Unit, // Renombrado para claridad en UI, mapea a onNewCategoryTypeChange en VM
-    onConfirmAddCategory: () -> Unit
+    uiState: CategoriesUiState
 ) {
-    // selectedTab sigue siendo local para controlar la BottomBar
     var selectedTab by remember { mutableStateOf("Categorías") }
 
     Scaffold(
         bottomBar = {
-            NavigationBar(
-                containerColor = Color.White,
-                tonalElevation = 8.dp
-            ) {
-                // Item Home
-                NavigationBarItem(
-                    icon = { Icon(painterResource(id = R.drawable.ic_home), "Home", Modifier.size(24.dp)) },
-                    label = { Text("Home", fontSize = 10.sp) },
-                    selected = selectedTab == "Home",
-                    onClick = {
-                        selectedTab = "Home"
-                        navController.navigate("start") { popUpTo("start") { inclusive = false }; launchSingleTop = true }
-                    },
-                    colors = NavigationBarItemDefaults.colors(selectedIconColor = Color(0xFF2D1B4E), selectedTextColor = Color(0xFF2D1B4E), indicatorColor = Color.Transparent, unselectedIconColor = Color.Gray, unselectedTextColor = Color.Gray)
-                )
-                // Item Categorías
-                NavigationBarItem(
-                    icon = { Icon(painterResource(id = R.drawable.ic_categorias), "Categorías", Modifier.size(24.dp)) },
-                    label = { Text("Categorías", fontSize = 10.sp) },
-                    selected = selectedTab == "Categorías",
-                    onClick = { selectedTab = "Categorías" /* Ya estás aquí */ },
-                    colors = NavigationBarItemDefaults.colors(selectedIconColor = Color(0xFF2D1B4E), selectedTextColor = Color(0xFF2D1B4E), indicatorColor = Color.Transparent, unselectedIconColor = Color.Gray, unselectedTextColor = Color.Gray)
-                )
-                // Item Pedidos
-                NavigationBarItem(
-                    icon = { Icon(painterResource(id = R.drawable.ic_pedido), "Pedidos", Modifier.size(24.dp)) },
-                    label = { Text("Pedidos", fontSize = 10.sp) },
-                    selected = selectedTab == "Pedidos",
-                    onClick = {
-                        selectedTab = "Pedidos"
-                        navController.navigate("pedidos") { popUpTo("start") { inclusive = false }; launchSingleTop = true }
-                    },
-                    colors = NavigationBarItemDefaults.colors(selectedIconColor = Color(0xFF2D1B4E), selectedTextColor = Color(0xFF2D1B4E), indicatorColor = Color.Transparent, unselectedIconColor = Color.Gray, unselectedTextColor = Color.Gray)
-                )
-            }
-        },
-        floatingActionButton = {
-            FloatingActionButton(
-                onClick = onAddCategoryClick, // Llama al evento del ViewModel para mostrar diálogo
-                containerColor = Color(0xFFFF801F), // Naranja
-                shape = CircleShape
-            ) {
-                Icon(
-                    imageVector = Icons.Default.Add,
-                    contentDescription = "Agregar categoría",
-                    tint = Color.White,
-                    modifier = Modifier.size(32.dp)
-                )
-            }
+            ModernNavigationBar(
+                selectedTab = selectedTab,
+                onTabSelected = { tab ->
+                    selectedTab = tab
+                    when (tab) {
+                        "Home" -> navController.navigate("start") {
+                            popUpTo("start") { inclusive = false }
+                            launchSingleTop = true
+                        }
+                        "Pedidos" -> navController.navigate("pedidos") {
+                            popUpTo("start") { inclusive = false }
+                            launchSingleTop = true
+                        }
+                    }
+                }
+            )
         }
     ) { paddingValues ->
-        // Contenido principal de la pantalla
         Column(
             modifier = Modifier
                 .fillMaxSize()
-                .background(Color(0xFFF5F5F5)) // Fondo gris claro
-                .padding(paddingValues) // Padding de Scaffold
-                .padding(horizontal = 16.dp), // Padding horizontal
+                .background(Color(0xFFFAFAFA))
+                .padding(paddingValues)
+                .padding(horizontal = 16.dp),
             horizontalAlignment = Alignment.CenterHorizontally
         ) {
-            Spacer(modifier = Modifier.height(16.dp)) // Espacio superior
+            Spacer(modifier = Modifier.height(24.dp))
 
-            // Título "Administración"
             Text(
                 text = "Administración",
-                fontSize = 20.sp,
-                color = Color(0xFFFF6B35), // Naranja
-                fontWeight = FontWeight.Bold
+                fontSize = 24.sp,
+                color = Color(0xFFFF801F),
+                fontWeight = FontWeight.Bold,
+                letterSpacing = 0.5.sp
+            )
+
+            Spacer(modifier = Modifier.height(8.dp))
+
+            Text(
+                text = "Gestiona tus categorías",
+                fontSize = 14.sp,
+                color = Color(0xFF757575),
+                fontWeight = FontWeight.Normal
             )
 
             Spacer(modifier = Modifier.height(24.dp))
 
-            // --- Sección de Lista de Categorías (Condicional) ---
-            if (uiState.isLoading) {
-                // Muestra indicador si está cargando
-                CircularProgressIndicator(modifier = Modifier.padding(top = 50.dp))
-            } else if (uiState.categories.isEmpty() && uiState.error == null) {
-                // Muestra mensaje si la lista está vacía (y no hay error)
-                Text(
-                    "No hay categorías para mostrar.\nPresiona '+' para agregar una.",
-                    modifier = Modifier.padding(top = 50.dp),
-                    textAlign = TextAlign.Center,
-                    color = Color.Gray
-                )
-            } else {
-                // Muestra la lista si hay categorías
-                LazyColumn(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .weight(1f), // Ocupa el espacio restante
-                    verticalArrangement = Arrangement.spacedBy(12.dp) // Espacio entre items
-                ) {
-                    items(uiState.categories, key = { it.idTipoProducto }) { category -> // Usa el ID como key
-                        CategoryItem(
-                            category = category, // Pasa el objeto CategoryResponse
-                            navController = navController
+            when {
+                uiState.isLoading -> {
+                    Column(
+                        modifier = Modifier
+                            .fillMaxSize()
+                            .padding(top = 80.dp),
+                        horizontalAlignment = Alignment.CenterHorizontally
+                    ) {
+                        CircularProgressIndicator(
+                            color = Color(0xFFFF801F),
+                            strokeWidth = 3.dp
                         )
+                        Spacer(modifier = Modifier.height(16.dp))
+                        Text(
+                            "Cargando categorías...",
+                            color = Color(0xFF757575),
+                            fontSize = 14.sp
+                        )
+                    }
+                }
+
+                uiState.categories.isEmpty() && uiState.error == null -> {
+                    Column(
+                        modifier = Modifier
+                            .fillMaxSize(),
+                        horizontalAlignment = Alignment.CenterHorizontally
+                    ) {
+                        Icon(
+                            Icons.Default.Category,
+                            contentDescription = null,
+                            modifier = Modifier.size(80.dp),
+                            tint = Color(0xFFE0E0E0)
+                        )
+                        Spacer(modifier = Modifier.height(16.dp))
+                        Text(
+                            "No hay categorías",
+                            fontSize = 20.sp,
+                            fontWeight = FontWeight.SemiBold,
+                            color = Color(0xFF424242)
+                        )
+                        Spacer(modifier = Modifier.height(8.dp))
+                        Text(
+                            "No se han creado categorías aún.",
+                            textAlign = TextAlign.Center,
+                            color = Color(0xFF757575),
+                            fontSize = 14.sp,
+                            lineHeight = 20.sp
+                        )
+                    }
+                }
+
+                else -> {
+                    LazyColumn(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .weight(1f),
+                        verticalArrangement = Arrangement.spacedBy(12.dp),
+                        contentPadding = PaddingValues(bottom = 80.dp)
+                    ) {
+                        items(uiState.categories, key = { it.idTipoProducto }) { category ->
+                            ModernCategoryItem(
+                                category = category,
+                                navController = navController
+                            )
+                        }
                     }
                 }
             }
 
-            // Muestra mensaje de error de carga si existe
             uiState.error?.let { error ->
                 Spacer(modifier = Modifier.height(16.dp))
-                Text(
-                    text = error,
-                    color = Color.Red,
-                    fontSize = 14.sp,
-                    textAlign = TextAlign.Center,
-                    modifier = Modifier.fillMaxWidth()
-                )
+                Surface(
+                    modifier = Modifier.fillMaxWidth(),
+                    shape = RoundedCornerShape(8.dp),
+                    color = Color(0xFFFFEBEE)
+                ) {
+                    Text(
+                        text = error,
+                        color = Color(0xFFC62828),
+                        fontSize = 14.sp,
+                        textAlign = TextAlign.Center,
+                        modifier = Modifier.padding(12.dp)
+                    )
+                }
             }
-        } // Fin Column principal
-
-        // --- Diálogo para Agregar Categoría ---
-        if (uiState.showAddDialog) {
-            AddCategoryDialog(
-                // --- CORREGIDO AQUÍ ---
-                newCategoryName = uiState.newCategoryType, // Pasa el valor correcto 'newCategoryType' del state
-                // --------------------
-                isAdding = uiState.isAdding,
-                addError = uiState.addError,
-                onDismiss = onDismissAddDialog,
-                onNameChange = onNewCategoryNameChange, // Llama a la función correcta (que actualiza newCategoryType en VM)
-                onConfirm = onConfirmAddCategory
-            )
         }
-    } // Fin Scaffold
+    }
 }
 
-// --- Composable para cada item de la lista ---
 @Composable
-fun CategoryItem(
-    category: CategoryResponse, // Recibe el objeto DTO
+fun ModernCategoryItem(
+    category: CategoryResponse,
     navController: NavController
 ) {
     Card(
         modifier = Modifier
             .fillMaxWidth()
-            .height(60.dp)
+            .height(80.dp)
+            .shadow(
+                elevation = 2.dp,
+                shape = RoundedCornerShape(16.dp),
+                spotColor = Color.Black.copy(alpha = 0.1f)
+            )
             .clickable {
-                // --- CORREGIDO AQUÍ ---
-                navController.navigate("categories_detail/${category.tipo}") // Usa el campo 'tipo' para la ruta
-                // --------------------
+                navController.navigate("categories_detail/${category.tipo}")
             },
-        shape = RoundedCornerShape(8.dp),
-        colors = CardDefaults.cardColors(
-            containerColor = Color.White // Fondo blanco para la tarjeta
-        ),
-        elevation = CardDefaults.cardElevation(defaultElevation = 0.dp) // Sin sombra por defecto
+        shape = RoundedCornerShape(16.dp),
+        colors = CardDefaults.cardColors(containerColor = Color.White),
+        elevation = CardDefaults.cardElevation(defaultElevation = 0.dp)
     ) {
         Box(
             modifier = Modifier
                 .fillMaxSize()
-                .border( // Borde morado
-                    width = 2.dp,
-                    color = Color(0xFF2D1B4E),
-                    shape = RoundedCornerShape(8.dp)
+                .background(
+                    Brush.horizontalGradient(
+                        colors = listOf(
+                            Color.White,
+                            Color(0xFFFFF9F5)
+                        )
+                    )
                 )
-                .padding(16.dp), // Padding interno
-            contentAlignment = Alignment.Center // Centra el texto
+                .border(
+                    width = 2.dp,
+                    brush = Brush.linearGradient(
+                        colors = listOf(
+                            Color(0xFF2D1B4E),
+                            Color(0xFF4A3566)
+                        )
+                    ),
+                    shape = RoundedCornerShape(16.dp)
+                )
+                .padding(horizontal = 20.dp, vertical = 16.dp),
+            contentAlignment = Alignment.CenterStart
         ) {
-            Text(
-                // --- CORREGIDO AQUÍ ---
-                text = category.tipo, // Muestra el campo 'tipo' del DTO
-                // --------------------
-                fontSize = 16.sp,
-                color = Color(0xFF2D1B4E), // Texto morado
-                fontWeight = FontWeight.Bold,
-                textAlign = TextAlign.Center
-            )
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.SpaceBetween
+            ) {
+                Text(
+                    text = category.tipo,
+                    fontSize = 18.sp,
+                    color = Color(0xFF2D1B4E),
+                    fontWeight = FontWeight.Bold,
+                    letterSpacing = 0.3.sp
+                )
+
+                Surface(
+                    shape = CircleShape,
+                    color = Color(0xFF2D1B4E).copy(alpha = 0.1f),
+                    modifier = Modifier.size(40.dp)
+                ) {
+                    Box(contentAlignment = Alignment.Center) {
+                        Icon(
+                            painter = painterResource(id = R.drawable.ic_categorias),
+                            contentDescription = null,
+                            tint = Color(0xFF2D1B4E),
+                            modifier = Modifier.size(20.dp)
+                        )
+                    }
+                }
+            }
         }
     }
 }
 
-// --- Composable para el Diálogo de Agregar ---
-@OptIn(ExperimentalMaterial3Api::class)
+// ============ COPIA DE MODERN NAVIGATION BAR (igual que en HomeScreen) ============
+
 @Composable
-fun AddCategoryDialog(
-    newCategoryName: String, // El nombre del parámetro aquí sigue siendo 'Name' por claridad en la UI
-    isAdding: Boolean,
-    addError: String?,
-    onDismiss: () -> Unit,
-    onNameChange: (String) -> Unit, // Esta función recibe el String del TextField
-    onConfirm: () -> Unit
+private fun ModernNavigationBar(
+    selectedTab: String,
+    onTabSelected: (String) -> Unit
 ) {
-    AlertDialog(
-        onDismissRequest = onDismiss, // Se cierra si se toca fuera
-        title = { Text("Agregar Nueva Categoría") },
-        text = {
-            Column {
-                OutlinedTextField(
-                    value = newCategoryName, // Usa el valor recibido (que viene de uiState.newCategoryType)
-                    onValueChange = onNameChange, // Llama a la función recibida (que llama a onNewCategoryTypeChange en VM)
-                    label = { Text("Nombre de la categoría") }, // El label puede seguir siendo "Nombre"
-                    isError = addError != null, // Marca en rojo si hay error
-                    singleLine = true, // Campo de una sola línea
-                    modifier = Modifier.fillMaxWidth()
+    Surface(
+        modifier = Modifier
+            .fillMaxWidth()
+            .shadow(8.dp),
+        color = Color.White
+    ) {
+        Row(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(vertical = 8.dp, horizontal = 16.dp),
+            horizontalArrangement = Arrangement.SpaceEvenly
+        ) {
+            listOf(
+                Triple("Home", R.drawable.ic_home, "Home"),
+                Triple("Categorías", R.drawable.ic_categorias, "Categorías"),
+                Triple("Pedidos", R.drawable.ic_pedido, "Pedidos")
+            ).forEach { (label, icon, tab) ->
+                ModernNavItem(
+                    label = label,
+                    icon = icon,
+                    selected = selectedTab == tab,
+                    onClick = { onTabSelected(tab) }
                 )
-                // Muestra el mensaje de error debajo del campo si existe
-                addError?.let {
-                    Text(
-                        it,
-                        color = MaterialTheme.colorScheme.error, // Color de error del tema
-                        style = MaterialTheme.typography.bodySmall, // Texto pequeño
-                        modifier = Modifier.padding(start = 16.dp, top = 4.dp)
-                    )
-                }
-            }
-        },
-        confirmButton = {
-            Button(onClick = onConfirm, enabled = !isAdding) { // Deshabilita mientras se agrega
-                if (isAdding) {
-                    // Muestra indicador de carga en el botón
-                    CircularProgressIndicator(
-                        Modifier.size(18.dp),
-                        color = LocalContentColor.current, // Color del texto del botón
-                        strokeWidth = 2.dp
-                    )
-                } else {
-                    Text("Agregar")
-                }
-            }
-        },
-        dismissButton = {
-            TextButton(onClick = onDismiss) {
-                Text("Cancelar")
             }
         }
+    }
+}
+
+@Composable
+private fun ModernNavItem(
+    label: String,
+    icon: Int,
+    selected: Boolean,
+    onClick: () -> Unit
+) {
+    val animatedColor by animateColorAsState(
+        targetValue = if (selected) Color(0xFF2D1B4E) else Color.Gray,
+        animationSpec = tween(300)
     )
+
+    Column(
+        modifier = Modifier
+            .clip(RoundedCornerShape(12.dp))
+            .background(
+                if (selected) Color(0xFFF5F0FF) else Color.Transparent
+            )
+            .padding(horizontal = 16.dp, vertical = 8.dp),
+        horizontalAlignment = Alignment.CenterHorizontally
+    ) {
+        androidx.compose.material3.IconButton(
+            onClick = onClick,
+            modifier = Modifier.size(32.dp)
+        ) {
+            androidx.compose.material3.Icon(
+                painter = painterResource(id = icon),
+                contentDescription = label,
+                tint = animatedColor,
+                modifier = Modifier.size(24.dp)
+            )
+        }
+        androidx.compose.material3.Text(
+            text = label,
+            fontSize = 11.sp,
+            color = animatedColor,
+            fontWeight = if (selected) FontWeight.SemiBold else FontWeight.Normal
+        )
+    }
 }

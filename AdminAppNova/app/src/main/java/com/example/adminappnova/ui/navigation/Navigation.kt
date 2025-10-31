@@ -1,5 +1,7 @@
 package com.example.adminappnova.ui.navigation
 
+import android.os.Build
+import androidx.annotation.RequiresApi
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect // <-- Importación necesaria
 import androidx.hilt.navigation.compose.hiltViewModel
@@ -26,6 +28,7 @@ import com.example.adminappnova.ui.viewmodel.PedidosViewModel
 import com.example.adminappnova.ui.viewmodel.ProductDetailViewModel
 import com.example.adminappnova.ui.viewmodel.ProductListViewModel
 
+@RequiresApi(Build.VERSION_CODES.O)
 @Composable
 fun AppNavigation(){
     val navController = rememberNavController()
@@ -67,11 +70,7 @@ fun AppNavigation(){
             val uiState = viewModel.uiState
             CategoriesScreen(
                 navController = navController,
-                uiState = uiState,
-                onAddCategoryClick = viewModel::onAddCategoryClicked,
-                onDismissAddDialog = viewModel::onDismissAddDialog,
-                onNewCategoryNameChange = viewModel::onNewCategoryTypeChange,
-                onConfirmAddCategory = viewModel::onConfirmAddCategory
+                uiState = uiState
             )
         }
 
@@ -162,6 +161,7 @@ fun AppNavigation(){
             // La pantalla DetallesPagoScreen obtiene el viewModel con hiltViewModel() directamente.
             DetallesPagoScreen(
                 navController = navController,
+                uiState = viewModel.uiState,
                 viewModel = viewModel
             )
         }
