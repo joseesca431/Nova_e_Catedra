@@ -37,7 +37,10 @@ fun CarritoScreen(
 ) {
     val uiState = viewModel.uiState
 
-    // No necesitas LaunchedEffect(Unit) aquí porque el ViewModel ya lo hace en su 'init'.
+    // Item seleccionado para eliminación (para mostrar modal)
+    var itemToRemove by remember { mutableStateOf<CarritoItemResponse?>(null) }
+    // Estado para controlar si el diálogo está visible
+    val showRemoveDialog = itemToRemove != null
 
     Scaffold { paddingValues ->
         Column(
@@ -58,17 +61,17 @@ fun CarritoScreen(
             when {
                 uiState.isLoading -> {
                     Box(modifier = Modifier.weight(1f), contentAlignment = Alignment.Center) {
-                        CircularProgressIndicator()
+                        CircularProgressIndicator(color = PurpleDark)
                     }
                 }
                 uiState.error != null -> {
                     Box(modifier = Modifier.weight(1f), contentAlignment = Alignment.Center) {
-                        Text(text = uiState.error)
+                        Text(text = uiState.error, color = Color.Red)
                     }
                 }
                 uiState.items.isEmpty() -> {
                     Box(modifier = Modifier.weight(1f), contentAlignment = Alignment.Center) {
-                        Text(text = "Tu carrito está vacío")
+                        Text(text = "Tu carrito está vacío", color = Color.Gray)
                     }
                 }
                 else -> {
@@ -82,7 +85,8 @@ fun CarritoScreen(
                         items(uiState.items, key = { it.idCarritoItem }) { item ->
                             CartItemCard(
                                 item = item,
-                                onRemove = { viewModel.removeItem(item.idCarritoItem) }
+                                // ahora solo notificamos que queremos eliminar, se muestra modal
+                                onRemoveClicked = { itemToRemove = it }
                             )
                         }
                     }
@@ -115,12 +119,10 @@ fun CarritoScreen(
                     }
                 }
 
-                // --- 👇👇👇 ¡¡¡EL CÓDIGO DE LA VICTORIA ESTÁ AQUÍ!!! 👇👇👇 ---
+                // Botón PAGAR (usa onPagarClick)
                 Button(
                     onClick = {
-                        // --- 👇 La llamada ahora es más simple y segura 👇 ---
                         val idCarritoValido = uiState.carrito?.idCarrito
-                        // La función onPagarClick ahora tiene la lógica de seguridad
                         onPagarClick(idCarritoValido ?: 0L)
                     },
                     enabled = uiState.items.isNotEmpty() && !uiState.isLoading,
@@ -132,19 +134,62 @@ fun CarritoScreen(
                 ) {
                     Text("PAGAR", color = Color.White, fontSize = 16.sp, fontWeight = FontWeight.Bold)
                 }
-                // --- --------------------------------------------------- ---
             }
+        }
+    }
+
+    // Diálogo de confirmación para eliminar item
+    if (showRemoveDialog) {
+        val item = itemToRemove
+        if (item != null) {
+            AlertDialog(
+                onDismissRequest = { itemToRemove = null },
+                title = {
+                    Text(text = "¿Eliminar producto?", color = PurpleDark, fontWeight = FontWeight.SemiBold)
+                },
+                text = {
+                    Column {
+                        Text(
+                            text = "¿Estás seguro que deseas eliminar \"${item.producto?.nombre ?: "este producto"}\" del carrito?",
+                            color = Color.Black
+                        )
+                        Spacer(modifier = Modifier.height(8.dp))
+                        Text(
+                            text = "No te preocupes — podrás agregarlo de nuevo si cambias de opinión.",
+                            color = Color.Gray,
+                            style = MaterialTheme.typography.bodySmall
+                        )
+                    }
+                },
+                confirmButton = {
+                    TextButton(
+                        onClick = {
+                            // Llamamos al viewModel para eliminar realmente
+                            viewModel.removeItem(item.idCarritoItem)
+                            itemToRemove = null
+                        }
+                    ) {
+                        Text("Eliminar", color = Color.Red, fontWeight = FontWeight.Bold)
+                    }
+                },
+                dismissButton = {
+                    TextButton(onClick = { itemToRemove = null }) {
+                        Text("Cancelar", color = PurpleDark)
+                    }
+                },
+                containerColor = Color.White
+            )
         }
     }
 }
 
 @Composable
-fun CartItemCard(item: CarritoItemResponse, onRemove: () -> Unit) {
+fun CartItemCard(item: CarritoItemResponse, onRemoveClicked: (CarritoItemResponse) -> Unit) {
     Card(
         modifier = Modifier
             .fillMaxWidth()
-            .height(80.dp),
-        shape = RoundedCornerShape(8.dp),
+            .height(90.dp),
+        shape = RoundedCornerShape(10.dp),
         colors = CardDefaults.cardColors(containerColor = Color.White),
         elevation = CardDefaults.cardElevation(defaultElevation = 2.dp)
     ) {
@@ -159,20 +204,33 @@ fun CartItemCard(item: CarritoItemResponse, onRemove: () -> Unit) {
                 contentDescription = item.producto?.nombre,
                 placeholder = painterResource(id = R.drawable.ic_producto),
                 modifier = Modifier
-                    .size(56.dp)
-                    .background(Color(0xFFF0F0F0), RoundedCornerShape(8.dp))
+                    .size(64.dp)
                     .clip(RoundedCornerShape(8.dp))
+                    .background(Color(0xFFF0F0F0))
             )
+
             Spacer(modifier = Modifier.width(12.dp))
+
             Column(
                 modifier = Modifier.weight(1f),
                 verticalArrangement = Arrangement.Center
             ) {
-                Text(item.producto?.nombre ?: "Producto", fontSize = 14.sp, fontWeight = FontWeight.Medium, color = Color.Black)
+                Text(
+                    text = item.producto?.nombre ?: "Producto",
+                    fontSize = 14.sp,
+                    fontWeight = FontWeight.Medium,
+                    color = Color.Black,
+                    maxLines = 2
+                )
+                Spacer(modifier = Modifier.height(4.dp))
                 Text("Cantidad: ${item.cantidad}", fontSize = 12.sp, color = Color.Gray)
             }
-            IconButton(onClick = onRemove, modifier = Modifier.size(40.dp)) {
-                Icon(Icons.Default.Delete, contentDescription = "Eliminar", tint = Color.Gray, modifier = Modifier.size(24.dp))
+
+            IconButton(
+                onClick = { onRemoveClicked(item) },
+                modifier = Modifier.size(40.dp)
+            ) {
+                Icon(Icons.Default.Delete, contentDescription = "Eliminar", tint = Color.Gray)
             }
         }
     }
