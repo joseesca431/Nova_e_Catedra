@@ -19,11 +19,11 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Delete
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
-import androidx.compose.runtime.getValue
-import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
@@ -37,7 +37,7 @@ import com.example.aplicacionjetpack.ui.theme.OrangeAccent
 import com.example.aplicacionjetpack.ui.theme.PurpleDark
 import com.example.aplicacionjetpack.ui.viewmodel.CheckoutViewModel
 
-// --- EL CÓDIGO HTML DEL MAPA (SIN CAMBIOS) ---
+// HTML sin cambios para el mapa
 private val mapHtml = """
 <!DOCTYPE html>
 <html>
@@ -73,6 +73,12 @@ private val mapHtml = """
 </html>
 """.trimIndent()
 
+// Palette local/refinada (respeta tus colores)
+private val BrandBlack = Color(0xFF000000)
+private val SoftBg = Color(0xFFF7F5F9)
+private val CardBg = Color(0xFFFFFFFF)
+private val MutedGray = Color(0xFF7A7A7A)
+
 @OptIn(ExperimentalMaterial3Api::class)
 @SuppressLint("SetJavaScriptEnabled")
 @Composable
@@ -85,6 +91,9 @@ fun ConfirmAddressScreen(
     var selectedDireccionId by remember { mutableStateOf<Long?>(null) }
     var mapTouched by remember { mutableStateOf(false) }
 
+    // Dialog para cuando usuario intenta avanzar sin dirección válida
+    var showMissingAddressDialog by remember { mutableStateOf(false) }
+
     // Sincroniza el ID seleccionado con el ViewModel
     LaunchedEffect(selectedDireccionId) {
         viewModel.setUsarDireccionExistenteId(selectedDireccionId)
@@ -93,26 +102,50 @@ fun ConfirmAddressScreen(
     Scaffold(
         topBar = {
             TopAppBar(
-                title = { Text("Toca el mapa para seleccionar", fontSize = 18.sp, color = PurpleDark, fontWeight = FontWeight.Medium) },
-                navigationIcon = {
-                    IconButton(onClick = { navController.navigateUp() }) {
-                        Icon(painter = painterResource(id = R.drawable.ic_atras), contentDescription = "Atrás", tint = PurpleDark)
+                title = {
+                    Column {
+                        Text(
+                            "Selecciona dirección",
+                            fontSize = 18.sp,
+                            color = PurpleDark,
+                            fontWeight = FontWeight.Medium
+                        )
+                        Text(
+                            "Toca el mapa o elige una dirección guardada",
+                            fontSize = 12.sp,
+                            color = MutedGray
+                        )
                     }
                 },
-                colors = TopAppBarDefaults.topAppBarColors(containerColor = Color.White)
+                navigationIcon = {
+                    IconButton(onClick = { navController.navigateUp() }) {
+                        Icon(
+                            painter = painterResource(id = R.drawable.ic_atras),
+                            contentDescription = "Atrás",
+                            tint = PurpleDark
+                        )
+                    }
+                },
+                colors = TopAppBarDefaults.topAppBarColors(containerColor = CardBg)
             )
-        }
+        },
+        containerColor = SoftBg
     ) { paddingValues ->
         Column(
             modifier = Modifier
                 .fillMaxSize()
-                .background(Color(0xFFF5F5F5))
                 .padding(paddingValues)
+                .background(SoftBg)
         ) {
+            // MAPA - ocupa aprox la mitad superior
             Box(
                 modifier = Modifier
                     .fillMaxWidth()
-                    .weight(1f)
+                    .height(320.dp)
+                    .padding(12.dp)
+                    .clip(RoundedCornerShape(12.dp))
+                    .background(Color(0xFFF3F3F5)),
+                contentAlignment = Alignment.Center
             ) {
                 AndroidView(
                     factory = { ctx ->
@@ -138,20 +171,29 @@ fun ConfirmAddressScreen(
                             loadDataWithBaseURL(null, mapHtml, "text/html", "UTF-8", null)
                         }
                     },
+                    update = { web ->
+                        // no-op; mantenemos el mapa cargado
+                    },
                     modifier = Modifier.fillMaxSize()
                 )
             }
 
+            // Panel inferior: direcciones guardadas + dirección seleccionada + alias
             Column(
                 modifier = Modifier
-                    .fillMaxWidth()
-                    .background(Color.White)
-                    .padding(16.dp)
-                    .verticalScroll(rememberScrollState()) // Añadimos scroll a la parte inferior
+                    .fillMaxSize()
+                    .padding(horizontal = 16.dp)
+                    .verticalScroll(rememberScrollState())
             ) {
-                Text("Mis Direcciones", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold, modifier = Modifier.padding(bottom = 8.dp))
+                Spacer(modifier = Modifier.height(8.dp))
+
+                Text("Mis Direcciones", style = MaterialTheme.typography.titleMedium, color = PurpleDark, fontWeight = FontWeight.SemiBold)
+                Spacer(modifier = Modifier.height(10.dp))
+
                 if (uiState.isLoadingDirecciones) {
-                    CircularProgressIndicator(modifier = Modifier.align(Alignment.CenterHorizontally))
+                    Box(Modifier.fillMaxWidth(), contentAlignment = Alignment.Center) {
+                        CircularProgressIndicator()
+                    }
                 } else if (uiState.direccionesGuardadas.isNotEmpty()) {
                     LazyRow(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
                         items(uiState.direccionesGuardadas, key = { it.idDireccion }) { direccion ->
@@ -165,82 +207,132 @@ fun ConfirmAddressScreen(
                                 },
                                 onDeleteClick = {
                                     viewModel.deleteDireccion(direccion.idDireccion)
+                                    if (selectedDireccionId == direccion.idDireccion) selectedDireccionId = null
                                 }
                             )
                         }
                     }
                 } else {
-                    Text("No tienes direcciones guardadas.", style = MaterialTheme.typography.bodyMedium, color = Color.Gray)
+                    Text("No tienes direcciones guardadas.", style = MaterialTheme.typography.bodyMedium, color = MutedGray)
                 }
 
                 Spacer(modifier = Modifier.height(16.dp))
 
-                // --- 👇👇👇 ¡¡¡LA LÓGICA DE LA VICTORIA ESTÁ AQUÍ!!! 👇👇👇 ---
-                // Si es una dirección NUEVA (tocada del mapa), mostramos el campo de alias.
+                // Si es una dirección nueva (mapTouched o usar nueva), permitir alias
                 if (uiState.usarDireccionExistenteId == null) {
-                    OutlinedTextField(
-                        value = uiState.aliasDireccion,
-                        onValueChange = viewModel::onAliasChange,
-                        label = { Text("Alias para esta nueva dirección (Ej: Casa, Oficina)") },
+                    Card(
                         modifier = Modifier
-                            .fillMaxWidth()
-                            .padding(bottom = 8.dp),
-                        singleLine = true,
-                        colors = OutlinedTextFieldDefaults.colors(
-                            focusedBorderColor = PurpleDark,
-                            unfocusedBorderColor = Color.LightGray
-                        )
-                    )
-                }
-                // --- ----------------------------------------------------- ---
-
-                Text("Enviar a:", style = MaterialTheme.typography.titleSmall, color = Color.Gray)
-
-                Box(contentAlignment = Alignment.CenterStart, modifier = Modifier.defaultMinSize(minHeight = 48.dp)) {
-                    when {
-                        mapTouched && uiState.isLoadingAddressFromMap -> {
-                            Row(verticalAlignment = Alignment.CenterVertically) {
-                                CircularProgressIndicator(modifier = Modifier.size(20.dp), strokeWidth = 2.dp)
-                                Spacer(modifier = Modifier.width(8.dp))
-                                Text("Buscando dirección...", color = Color.Gray)
+                            .fillMaxWidth(),
+                        colors = CardDefaults.cardColors(containerColor = CardBg),
+                        shape = RoundedCornerShape(10.dp),
+                        elevation = CardDefaults.cardElevation(defaultElevation = 4.dp)
+                    ) {
+                        Column(modifier = Modifier.padding(12.dp)) {
+                            Text("Nueva dirección seleccionada", fontWeight = FontWeight.SemiBold, color = BrandBlack)
+                            Spacer(modifier = Modifier.height(8.dp))
+                            OutlinedTextField(
+                                value = uiState.aliasDireccion,
+                                onValueChange = viewModel::onAliasChange,
+                                label = { Text("Alias (Ej: Casa, Oficina)", color = MutedGray) },
+                                modifier = Modifier.fillMaxWidth(),
+                                singleLine = true,
+                                colors = OutlinedTextFieldDefaults.colors(
+                                    focusedBorderColor = PurpleDark,
+                                    unfocusedBorderColor = Color.LightGray,
+                                    focusedLabelColor = PurpleDark
+                                )
+                            )
+                            Spacer(modifier = Modifier.height(8.dp))
+                            // Preview de la dirección que vino del mapa (si existe)
+                            if (mapTouched && uiState.isLoadingAddressFromMap) {
+                                Row(verticalAlignment = Alignment.CenterVertically) {
+                                    CircularProgressIndicator(modifier = Modifier.size(18.dp), strokeWidth = 2.dp)
+                                    Spacer(modifier = Modifier.width(8.dp))
+                                    Text("Buscando dirección...", color = MutedGray)
+                                }
+                            } else if (viewModel.isAddressValid) {
+                                Text(
+                                    text = uiState.direccion,
+                                    fontWeight = FontWeight.SemiBold,
+                                    fontSize = 14.sp,
+                                    color = BrandBlack,
+                                    maxLines = 2,
+                                    overflow = TextOverflow.Ellipsis
+                                )
+                            } else {
+                                Text("Toca el mapa para seleccionar coordenadas", color = MutedGray)
                             }
                         }
-                        viewModel.isAddressValid -> {
-                            Text(
-                                text = uiState.direccion,
-                                fontWeight = FontWeight.SemiBold,
-                                fontSize = 16.sp,
-                                maxLines = 2,
-                                overflow = TextOverflow.Ellipsis
-                            )
-                        }
-                        else -> {
-                            Text(
-                                text = "Toca el mapa o selecciona una dirección",
-                                color = Color.Gray,
-                                fontSize = 16.sp
-                            )
-                        }
+                    }
+                } else {
+                    // Si se usa una existente, mostrar resumen
+                    Spacer(modifier = Modifier.height(8.dp))
+                    Text("Enviar a:", style = MaterialTheme.typography.titleSmall, color = MutedGray)
+                    Spacer(modifier = Modifier.height(6.dp))
+                    Box(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .clip(RoundedCornerShape(10.dp))
+                            .background(CardBg)
+                            .padding(12.dp)
+                    ) {
+                        Text(
+                            text = uiState.direccion.ifBlank { "Dirección seleccionada" },
+                            fontWeight = FontWeight.SemiBold,
+                            color = BrandBlack
+                        )
                     }
                 }
 
+                Spacer(modifier = Modifier.height(16.dp))
+
                 if (uiState.error != null) {
-                    Text(text = uiState.error, color = MaterialTheme.colorScheme.error, modifier = Modifier.padding(top = 8.dp))
+                    Text(uiState.error, color = MaterialTheme.colorScheme.error)
+                    Spacer(modifier = Modifier.height(8.dp))
                 }
 
+                // Botón continuar: valida que exista dirección válida
                 Button(
                     onClick = {
-                        navController.navigate("detalles_pago/$idCarrito")
+                        if (viewModel.isAddressValid) {
+                            navController.navigate("detalles_pago/$idCarrito")
+                        } else {
+                            showMissingAddressDialog = true
+                        }
                     },
-                    enabled = viewModel.isAddressValid && !uiState.isLoading,
-                    modifier = Modifier.fillMaxWidth().height(48.dp).padding(top = 8.dp),
+                    enabled = !uiState.isLoading,
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .height(48.dp),
                     colors = ButtonDefaults.buttonColors(containerColor = OrangeAccent),
                     shape = RoundedCornerShape(8.dp)
                 ) {
                     Text("CONTINUAR", color = Color.White, fontSize = 16.sp, fontWeight = FontWeight.Bold)
                 }
+
+                Spacer(modifier = Modifier.height(24.dp))
             }
         }
+    }
+
+    // Dialogo amable si falta dirección
+    if (showMissingAddressDialog) {
+        AlertDialog(
+            onDismissRequest = { showMissingAddressDialog = false },
+            confirmButton = {
+                TextButton(onClick = { showMissingAddressDialog = false }) {
+                    Text("Entendido", color = OrangeAccent, fontWeight = FontWeight.Bold)
+                }
+            },
+            title = { Text("Dirección no seleccionada", color = BrandBlack, fontWeight = FontWeight.SemiBold) },
+            text = {
+                Text(
+                    "No has seleccionado una dirección válida. Toca el mapa para marcar el sitio o elige una dirección guardada.",
+                    color = BrandBlack.copy(alpha = 0.95f)
+                )
+            },
+            containerColor = CardBg
+        )
     }
 }
 
@@ -254,36 +346,51 @@ private fun DireccionGuardadaCard(
     Box {
         Card(
             modifier = Modifier
-                .width(200.dp)
-                .clickable(onClick = onClick)
-                .border(
-                    width = 2.dp,
-                    color = if (isSelected) OrangeAccent else Color.Transparent,
-                    shape = RoundedCornerShape(8.dp)
-                ),
-            shape = RoundedCornerShape(8.dp),
-            colors = CardDefaults.cardColors(containerColor = Color(0xFFF0F0F0))
+                .width(220.dp)
+                .clickable(onClick = onClick),
+            shape = RoundedCornerShape(10.dp),
+            colors = CardDefaults.cardColors(containerColor = CardBg),
+            elevation = CardDefaults.cardElevation(defaultElevation = 4.dp)
         ) {
             Column(modifier = Modifier.padding(12.dp)) {
-                Text(direccion.alias, fontWeight = FontWeight.Bold, color = PurpleDark, maxLines = 1, overflow = TextOverflow.Ellipsis)
-                Text(direccion.calle, maxLines = 2, fontSize = 12.sp, overflow = TextOverflow.Ellipsis)
-                Text("${direccion.ciudad}, ${direccion.departamento}", fontSize = 12.sp, color = Color.Gray, maxLines = 1, overflow = TextOverflow.Ellipsis)
+                Text(
+                    direccion.alias,
+                    fontWeight = FontWeight.SemiBold,
+                    color = PurpleDark,
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis
+                )
+                Spacer(modifier = Modifier.height(6.dp))
+                Text(direccion.calle, maxLines = 2, fontSize = 12.sp, color = BrandBlack)
+                Spacer(modifier = Modifier.height(6.dp))
+                Text("${direccion.ciudad}, ${direccion.departamento}", fontSize = 12.sp, color = MutedGray)
             }
+        }
+
+        // Indicador de selección y botón eliminar
+        if (isSelected) {
+            Box(
+                modifier = Modifier
+                    .offset(x = (220 - 28).dp, y = 8.dp)
+                    .size(20.dp)
+                    .clip(CircleShape)
+                    .background(OrangeAccent)
+            )
         }
 
         IconButton(
             onClick = onDeleteClick,
             modifier = Modifier
                 .align(Alignment.TopEnd)
-                .padding(4.dp)
-                .size(24.dp)
-                .background(Color.Gray.copy(alpha = 0.5f), CircleShape)
+                .padding(6.dp)
+                .size(28.dp)
+                .background(Color.Gray.copy(alpha = 0.12f), CircleShape)
         ) {
             Icon(
                 imageVector = Icons.Default.Delete,
-                contentDescription = "Borrar dirección",
-                tint = Color.White,
-                modifier = Modifier.size(16.dp)
+                contentDescription = "Eliminar",
+                tint = Color.DarkGray,
+                modifier = Modifier.size(18.dp)
             )
         }
     }
