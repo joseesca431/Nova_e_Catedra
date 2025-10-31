@@ -399,10 +399,12 @@ private fun FormTextField(
     visualTransformation: VisualTransformation = VisualTransformation.None,
     errorText: String? = null
 ) {
-    Column(modifier = modifier
-        .fillMaxWidth()
-        .padding(bottom = 8.dp)
+    Column(
+        modifier = modifier
+            .fillMaxWidth()
+            .padding(bottom = 8.dp)
     ) {
+        // Este Text actúa como un Label externo, siempre visible y negro.
         Text(
             text = label,
             fontSize = 13.sp,
@@ -424,23 +426,49 @@ private fun FormTextField(
             enabled = enabled,
             trailingIcon = trailingIcon,
             colors = OutlinedTextFieldDefaults.colors(
+                // Colores para el TEXTO DENTRO del campo
+                focusedTextColor = Color.Black,
+                unfocusedTextColor = Color.Black,
+                disabledTextColor = Color.Black, // ¡TEXTO NEGRO INCLUSO DESHABILITADO!
+
+                // Colores para los BORDES
                 focusedBorderColor = if (isError) MaterialTheme.colorScheme.error else Color(0xFF2D1B4E),
                 unfocusedBorderColor = if (isError) MaterialTheme.colorScheme.error else Color.LightGray,
-                errorBorderColor = MaterialTheme.colorScheme.error,
-                focusedLabelColor = if (isError) MaterialTheme.colorScheme.error else Color.Black
-            )
+                disabledBorderColor = Color.LightGray, // Borde gris claro cuando está deshabilitado
+
+                // Color para el CURSOR
+                cursorColor = Color(0xFF2D1B4E),
+
+                // Colores para los ÍCONOS
+                focusedTrailingIconColor = Color(0xFF2D1B4E),
+                unfocusedTrailingIconColor = Color.Black.copy(alpha = 0.7f),
+                disabledTrailingIconColor = Color.Black.copy(alpha = 0.7f) // Ícono visible cuando está deshabilitado
+
+                // --- 👇👇👇 ¡¡¡LOS PARÁMETROS INVENTADOS HAN SIDO ANIQUILADOS!!! 👇👇👇 ---
+                // NO EXISTEN: placeholderColor, disabledPlaceholderColor
+                // --- ------------------------------------------------------------------ ---
+            ),
+            placeholder = {
+                Text(
+                    text = if (value.isEmpty() && label != "Fecha Nacimiento (*)") "Escribe aquí..." else "",
+                    color = Color.Gray, // <-- El color del placeholder se define aquí.
+                    fontSize = 14.sp
+                )
+            }
         )
 
+        // Muestra el texto de error debajo si existe
         if (!errorText.isNullOrBlank()) {
             Text(
                 text = errorText,
                 color = MaterialTheme.colorScheme.error,
                 fontSize = 12.sp,
-                modifier = Modifier.padding(top = 6.dp)
+                modifier = Modifier.padding(top = 4.dp, start = 4.dp)
             )
         }
     }
 }
+
 
 @Preview(showBackground = true)
 @Composable
