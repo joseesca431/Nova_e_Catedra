@@ -19,17 +19,20 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.navigation.NavController
-// --- 👇👇👇 ¡¡¡LOS IMPORTS CORRECTOS DE LA VICTORIA!!! 👇👇👇 ---
 import com.example.aplicacionjetpack.data.dto.HistorialPedidoResponse
 import com.example.aplicacionjetpack.ui.theme.PurpleDark
-import com.example.aplicacionjetpack.ui.viewmodel.HistorialPedidoViewModel // ¡EL NOMBRE CORRECTO!
-// --- ------------------------------------------------------------- ---
+import com.example.aplicacionjetpack.ui.viewmodel.HistorialPedidoViewModel
+
+// --- 👇👇👇 ¡¡¡NUEVOS COLORES PARA LOS ESTADOS!!! 👇👇👇 ---
+val EstadoVerde = Color(0xFF4CAF50)      // Verde para Entregado/Pagado
+val EstadoAmarillo = Color(0xFFFFA000)   // Naranja/Amarillo para Pendiente/En_Proceso
+val EstadoRojo = Color(0xFFD32F2F)       // Rojo para Cancelado
+// --- ---------------------------------------------------- ---
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun HistorialComprasScreen(
     navController: NavController,
-    // --- 👇 ¡USAMOS EL VIEWMODEL CON EL NOMBRE CORRECTO! 👇 ---
     viewModel: HistorialPedidoViewModel = hiltViewModel()
 ) {
     val uiState = viewModel.uiState
@@ -69,13 +72,12 @@ fun HistorialComprasScreen(
                         )
                     }
                 }
-                // --- 👇 ¡LA UI STATE USA 'pedidos', NO 'historial'! 👇 ---
                 uiState.pedidos.isEmpty() -> {
                     Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
                         Column(horizontalAlignment = Alignment.CenterHorizontally, modifier = Modifier.padding(16.dp)) {
                             Icon(Icons.Default.History, "Sin Historial", modifier = Modifier.size(64.dp), tint = Color.Gray)
                             Spacer(modifier = Modifier.height(16.dp))
-                            Text("Aún no tienes compras en tu historial.", color = Color.Gray, textAlign = TextAlign.Center)
+                            Text("No tienes compras relevantes en tu historial.", color = Color.Gray, textAlign = TextAlign.Center)
                         }
                     }
                 }
@@ -84,12 +86,9 @@ fun HistorialComprasScreen(
                         contentPadding = PaddingValues(16.dp),
                         verticalArrangement = Arrangement.spacedBy(12.dp)
                     ) {
-                        // --- 👇👇👇 ¡¡¡LA KEY ÚNICA Y DEFINITIVA QUE EVITA EL CRASH!!! 👇👇👇 ---
-                        // Usamos 'idHistorialPedido' que SÍ es único para cada entrada.
                         items(uiState.pedidos, key = { it.idHistorialPedido }) { pedidoItem ->
                             HistorialCard(item = pedidoItem)
                         }
-                        // --- ------------------------------------------------------------------ ---
                     }
                 }
             }
@@ -97,8 +96,12 @@ fun HistorialComprasScreen(
     }
 }
 
+// --- 👇👇👇 ¡AQUÍ INYECTAMOS EL COLOR! 👇👇👇 ---
 @Composable
 private fun HistorialCard(item: HistorialPedidoResponse) {
+    // Obtenemos el color basado en el estado del item
+    val estadoColor = obtenerColorPorEstado(item.estado)
+
     Card(
         modifier = Modifier.fillMaxWidth(),
         shape = RoundedCornerShape(8.dp),
@@ -109,29 +112,44 @@ private fun HistorialCard(item: HistorialPedidoResponse) {
             modifier = Modifier
                 .padding(16.dp)
                 .fillMaxWidth(),
-            verticalAlignment = Alignment.CenterVertically,
-            horizontalArrangement = Arrangement.SpaceBetween
+            verticalAlignment = Alignment.CenterVertically
         ) {
             Column(modifier = Modifier.weight(1f)) {
                 Text(
-                    // Mostramos el ID del pedido, aunque la key de la lista sea otra.
                     text = "Pedido #${item.idPedido}",
                     fontWeight = FontWeight.Bold,
                     color = PurpleDark,
                     fontSize = 16.sp
                 )
                 Spacer(modifier = Modifier.height(4.dp))
-                Text(
-                    text = "Estado: ${item.estado}",
-                    style = MaterialTheme.typography.bodyMedium,
-                    color = Color.DarkGray
-                )
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    Text("Estado: ", style = MaterialTheme.typography.bodyMedium, color = Color.DarkGray)
+                    Text(
+                        text = item.estado?.replace("_", " ") ?: "DESCONOCIDO", // Reemplaza "_" por espacio
+                        style = MaterialTheme.typography.bodyMedium,
+                        fontWeight = FontWeight.SemiBold,
+                        color = estadoColor // ¡COLOR APLICADO!
+                    )
+                }
             }
             Text(
-                text = item.fecha, // 'fecha' sí existe y es correcto
+                text = item.fecha?.substringBefore("T") ?: "", // Mostramos solo la fecha
                 style = MaterialTheme.typography.labelSmall,
                 color = Color.Gray
             )
         }
+    }
+}
+
+/**
+ * Función helper que devuelve un color basado en el string del estado.
+ */
+@Composable
+private fun obtenerColorPorEstado(estado: String?): Color {
+    return when (estado?.uppercase()) {
+        "ENTREGADO", "PAGADO" -> EstadoVerde
+        "CANCELADO" -> EstadoRojo
+        "EN_PROCESO" -> EstadoAmarillo
+        else -> Color.Gray // Color por defecto para estados desconocidos o nulos
     }
 }

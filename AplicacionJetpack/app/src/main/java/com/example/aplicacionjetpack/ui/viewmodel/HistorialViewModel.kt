@@ -39,9 +39,6 @@ class HistorialPedidoViewModel @Inject constructor(
     }
 
     fun loadHistorial() {
-        // --- 👇👇👇 ¡¡¡LA LÓGICA DE FILTRADO EN CLIENTE DE LA VICTORIA!!! 👇👇👇 ---
-
-        // 1. Obtener el ID del usuario que ha iniciado sesión. ¡Es la clave de todo!
         val currentUserId = AuthManager.userId
         if (currentUserId == null) {
             Log.e(TAG, "No se puede cargar el historial: Usuario no autenticado.")
@@ -53,26 +50,28 @@ class HistorialPedidoViewModel @Inject constructor(
 
         viewModelScope.launch {
             uiState = uiState.copy(isLoading = true, error = null)
-
-            // 2. Pedir TODOS los pedidos al backend (página 0, hasta 100 items).
             val result = repository.getHistorialPaginado(page = 0, size = 100)
 
             result.onSuccess { pagedResponse ->
                 val todosLosPedidos = pagedResponse.content
                 Log.d(TAG, "Se recibieron ${todosLosPedidos.size} pedidos en total del backend.")
 
-                // 3. ¡LA MAGIA! Filtramos la lista completa que llegó del backend.
-                val misPedidos = todosLosPedidos.filter { pedido ->
-                    // Comparamos el 'idUser' de cada pedido con el del usuario actual.
-                    pedido.idUser == currentUserId
+                // --- 👇👇👇 ¡¡¡EL DOBLE FILTRO DE LA VICTORIA!!! 👇👇👇 ---
+                val misPedidosFiltrados = todosLosPedidos.filter { pedido ->
+                    // Condición 1: El pedido DEBE ser del usuario actual.
+                    val esMio = pedido.idUser == currentUserId
+                    // Condición 2: El estado del pedido NO DEBE ser "PENDIENTE".
+                    val noEsPendiente = pedido.estado.equals("PENDIENTE", ignoreCase = true).not()
+
+                    esMio && noEsPendiente // Se deben cumplir AMBAS condiciones.
                 }
+                // --- ---------------------------------------------------- ---
 
-                Log.d(TAG, "Filtrado a ${misPedidos.size} pedidos que pertenecen al usuario $currentUserId.")
+                Log.d(TAG, "Filtrado a ${misPedidosFiltrados.size} pedidos que pertenecen al usuario $currentUserId y no están pendientes.")
 
-                // 4. Actualizamos la UI solo con la lista filtrada y ordenada.
                 uiState = uiState.copy(
                     isLoading = false,
-                    pedidos = misPedidos.sortedByDescending { it.fecha } // Ordenamos lo más reciente primero
+                    pedidos = misPedidosFiltrados.sortedByDescending { it.fecha }
                 )
 
             }.onFailure { exception ->
