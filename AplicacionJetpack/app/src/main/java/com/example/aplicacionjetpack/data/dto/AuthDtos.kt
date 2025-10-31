@@ -6,22 +6,23 @@ data class LoginRequest(
     val password: String
 )
 
-// Coincide con tu UserCreateRequest.java (que se usa para /auth/register)
+/**
+* RegisterRequest usado por el cliente.
+* Nota: fechaNacimiento debe enviarse en formato "dd/MM/yyyy"
+* (coincide con el @JsonFormat(pattern = "dd/MM/yyyy") del DTO Java).
+*/
 data class RegisterRequest(
-    val primerNombre: String,
-    val primerApellido: String,
-    val email: String,
     val username: String,
     val password: String,
-    val fechaNacimiento: String, // Enviar como String ISO "YYYY-MM-DD"
-    val roleName: String,
-    // Campos Opcionales (pueden ser null o String vacío)
+    val email: String,
+    val primerNombre: String,
     val segundoNombre: String? = null,
+    val primerApellido: String,
     val segundoApellido: String? = null,
+    val fechaNacimiento: String, // "dd/MM/yyyy"
     val telefono: String? = null,
-    val dui: String? = null, // Renombrado de DUI
+    val dui: String? = null,
     val direccion: String? = null
 )
-
 // NOTA: Tu API devuelve un String (token) para login/register,
 // así que NO necesitamos un AuthResponse DTO.

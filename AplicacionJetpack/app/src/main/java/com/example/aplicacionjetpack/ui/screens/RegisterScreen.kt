@@ -1,34 +1,42 @@
 package com.example.aplicacionjetpack.ui.screens
 
+import android.content.Context
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
-import androidx.compose.foundation.clickable // Importar
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.foundation.verticalScroll
-// Importaciones para el Calendario
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.DateRange
+import androidx.compose.material.icons.filled.Visibility
+import androidx.compose.material.icons.filled.VisibilityOff
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.text.input.PasswordVisualTransformation
 import androidx.compose.ui.text.input.VisualTransformation
 import androidx.compose.ui.text.style.TextAlign
+import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.navigation.NavController
+import androidx.navigation.NavHostController
+import androidx.navigation.compose.rememberNavController
 import com.example.aplicacionjetpack.R
 import com.example.aplicacionjetpack.ui.viewmodel.RegisterUiState
-import java.time.Instant // Importar para el DatePicker
-import java.time.ZoneId // Importar para el DatePicker
+import java.time.Instant
+import java.time.ZoneId
+import androidx.compose.runtime.saveable.rememberSaveable
+import androidx.compose.ui.tooling.preview.Preview
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -37,8 +45,9 @@ fun RegisterScreen(
     uiState: RegisterUiState,
     // --- Eventos ---
     onPrimerNombreChange: (String) -> Unit,
+    onSegundoNombreChange: (String) -> Unit,
     onPrimerApellidoChange: (String) -> Unit,
-    // onFechaNacimientoChange: (String) -> Unit, // Ya no se usa
+    onSegundoApellidoChange: (String) -> Unit,
     onEmailChange: (String) -> Unit,
     onUsernameChange: (String) -> Unit,
     onPasswordChange: (String) -> Unit,
@@ -46,19 +55,18 @@ fun RegisterScreen(
     onTelefonoChange: (String) -> Unit,
     onDuiChange: (String) -> Unit,
     onDireccionChange: (String) -> Unit,
-    onSegundoNombreChange: (String) -> Unit,
-    onSegundoApellidoChange: (String) -> Unit,
     onRegisterClick: () -> Unit,
-    // --- EVENTOS NUEVOS DEL CALENDARIO ---
+    // --- EVENTOS DEL CALENDARIO ---
     onFechaNacimientoClicked: () -> Unit,
     onCalendarDismiss: () -> Unit,
-    onDateSelected: (Long?) -> Unit
-){
-    // --- Efecto para navegar ---
+    onDateSelected: (Long?) -> Unit,
+    // --- Nuevo: callback para cerrar modal de errores ---
+    onDismissErrorDialog: () -> Unit
+) {
+    // Navegar al home cuando el registro es exitoso
     LaunchedEffect(key1 = uiState.registerSuccess) {
         if (uiState.registerSuccess) {
-            // Navega al Home (o 'start') y limpia el historial
-            navController.navigate("home") { // Asume "home" como ruta
+            navController.navigate("home") {
                 popUpTo("register") { inclusive = true }
                 popUpTo("login") { inclusive = true }
                 launchSingleTop = true
@@ -66,14 +74,12 @@ fun RegisterScreen(
         }
     }
 
-    // --- Estado para el DatePicker (CORREGIDO) ---
+    // DatePicker state con valor por defecto (aprox. 18 años atrás)
     val datePickerState = rememberDatePickerState(
-        initialSelectedDateMillis = Instant.now().minusMillis(568025136000L).toEpochMilli() // Aprox. 18 años
+        initialSelectedDateMillis = Instant.now().minusMillis(568025136000L).toEpochMilli()
     )
     val showCalendar = uiState.showCalendarDialog
-    // --------------------------------
 
-    // --- DIÁLOGO DE CALENDARIO (DatePickerDialog) ---
     if (showCalendar) {
         DatePickerDialog(
             onDismissRequest = onCalendarDismiss,
@@ -94,108 +100,228 @@ fun RegisterScreen(
             DatePicker(state = datePickerState)
         }
     }
-    // --- --------------------------------------- ---
+
+    // Helpers para errores por campo (busca coincidencias en la lista de validaciones)
+    fun fieldHasError(keyword: String): Boolean =
+        uiState.validationErrorsList.any { it.contains(keyword, ignoreCase = true) }
+
+    fun fieldErrorText(keyword: String): String? =
+        uiState.validationErrorsList.firstOrNull { it.contains(keyword, ignoreCase = true) }
+
+    // Toggles para mostrar/ocultar contraseñas
+    var showPassword by rememberSaveable { mutableStateOf(false) }
+    var showConfirmPassword by rememberSaveable { mutableStateOf(false) }
 
     Column(
         modifier = Modifier
             .fillMaxSize()
             .background(Color.White)
-            .padding(24.dp)
+            .padding(20.dp)
             .verticalScroll(rememberScrollState()),
         horizontalAlignment = Alignment.CenterHorizontally
-    ){
-        Spacer(modifier = Modifier.height(60.dp))
+    ) {
+        Spacer(modifier = Modifier.height(36.dp))
 
-        // --- CORREGIDO: Imagen ---
         Image(
             painter = painterResource(id = R.drawable.novainicio),
             contentDescription = "Logo NOVA+e",
             modifier = Modifier
                 .fillMaxWidth()
-                .padding(horizontal = 20.dp)
                 .height(90.dp)
-                .padding(bottom = 8.dp)
+                .padding(horizontal = 16.dp)
         )
-        // -----------------------
 
         Text(
             text = "Únete y empieza tu aventura hoy.",
-            fontSize = 22.sp,
+            fontSize = 20.sp,
             color = Color(0xFFFF6B35),
             fontWeight = FontWeight.Medium,
-            modifier = Modifier.padding(bottom = 30.dp)
+            modifier = Modifier.padding(vertical = 14.dp)
         )
 
-        // --- Campos del Formulario ---
-        FormTextField(label = "Primer Nombre (*)", value = uiState.primerNombre, onValueChange = onPrimerNombreChange, isError = uiState.error?.contains("Nombre") == true)
-        FormTextField(label = "Primer Apellido (*)", value = uiState.primerApellido, onValueChange = onPrimerApellidoChange, isError = uiState.error?.contains("Apellido") == true)
-        FormTextField(label = "Email (*)", value = uiState.email, onValueChange = onEmailChange, keyboardType = KeyboardType.Email, isError = uiState.error?.contains("Email") == true)
-        FormTextField(label = "Nombre de Usuario (*)", value = uiState.username, onValueChange = onUsernameChange, isError = uiState.error?.contains("Usuario") == true)
+        // ======= REORDENADO SEGÚN TU PETICIÓN =======
+        // Grupo: Primer Nombre + Segundo Nombre
+        FormTextField(
+            label = "Primer Nombre (*)",
+            value = uiState.primerNombre,
+            onValueChange = onPrimerNombreChange,
+            isError = fieldHasError("primer nombre") || fieldHasError("nombre"),
+            errorText = fieldErrorText("primer nombre") ?: fieldErrorText("nombre")
+        )
 
-        // --- CAMPO DE FECHA DE NACIMIENTO (MODIFICADO) ---
-        Box(modifier = Modifier.clickable { onFechaNacimientoClicked() }) {
+        FormTextField(
+            label = "Segundo Nombre (*)",
+            value = uiState.segundoNombre,
+            onValueChange = onSegundoNombreChange,
+            isError = fieldHasError("segundo nombre"),
+            errorText = fieldErrorText("segundo nombre")
+        )
+
+        // Grupo: Primer Apellido + Segundo Apellido
+        FormTextField(
+            label = "Primer Apellido (*)",
+            value = uiState.primerApellido,
+            onValueChange = onPrimerApellidoChange,
+            isError = fieldHasError("apellido"),
+            errorText = fieldErrorText("apellido")
+        )
+
+        FormTextField(
+            label = "Segundo Apellido (*)",
+            value = uiState.segundoApellido,
+            onValueChange = onSegundoApellidoChange,
+            isError = fieldHasError("segundo apellido"),
+            errorText = fieldErrorText("segundo apellido")
+        )
+        // =================================================
+
+        FormTextField(
+            label = "Email (*)",
+            value = uiState.email,
+            onValueChange = onEmailChange,
+            keyboardType = KeyboardType.Email,
+            isError = fieldHasError("correo") || fieldHasError("email"),
+            errorText = fieldErrorText("correo") ?: fieldErrorText("email")
+        )
+
+        FormTextField(
+            label = "Nombre de Usuario (*)",
+            value = uiState.username,
+            onValueChange = onUsernameChange,
+            isError = fieldHasError("usuario") || fieldHasError("nombre de usuario"),
+            errorText = fieldErrorText("usuario") ?: fieldErrorText("nombre de usuario")
+        )
+
+        // Fecha de nacimiento: campo no editable que abre el DatePicker
+        Box(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(bottom = 12.dp)
+                .clickable { onFechaNacimientoClicked() }
+        ) {
             FormTextField(
                 label = "Fecha Nacimiento (*)",
                 value = uiState.fechaNacimiento,
-                onValueChange = {}, // No editable
+                onValueChange = {},
                 readOnly = true,
-                enabled = false, // Deshabilitado
+                enabled = false,
                 trailingIcon = { Icon(imageVector = Icons.Default.DateRange, contentDescription = "Calendario") },
-                colors = OutlinedTextFieldDefaults.colors(
-                    disabledBorderColor = if (uiState.error?.contains("Fecha") == true) Color.Red else Color.LightGray,
-                    disabledTextColor = if (uiState.error?.contains("Fecha") == true) Color.Red else Color.Black,
-                    disabledLabelColor = if (uiState.error?.contains("Fecha") == true) Color.Red else Color.Black,
-                    disabledTrailingIconColor = if (uiState.error?.contains("Fecha") == true) Color.Red else Color.Black,
-                    disabledContainerColor = Color.White
-                )
+                isError = fieldHasError("fecha")
             )
         }
-        // --------------------------------------------
-
-        FormTextField(label = "Contraseña (min 6 char) (*)", value = uiState.password, onValueChange = onPasswordChange, keyboardType = KeyboardType.Password, isError = uiState.error?.contains("Contraseña") == true)
-        FormTextField(label = "Confirmar Contraseña (*)", value = uiState.confirmPassword, onValueChange = onConfirmPasswordChange, keyboardType = KeyboardType.Password, isError = uiState.error?.contains("Contraseña") == true)
-
-        // --- Campos Opcionales ---
-        FormTextField(label = "Segundo Nombre (Opcional)", value = uiState.segundoNombre, onValueChange = onSegundoNombreChange)
-        FormTextField(label = "Segundo Apellido (Opcional)", value = uiState.segundoApellido, onValueChange = onSegundoApellidoChange)
-        FormTextField(label = "Teléfono (Opcional)", value = uiState.telefono, onValueChange = onTelefonoChange, keyboardType = KeyboardType.Phone)
-        FormTextField(label = "DUI (Opcional)", value = uiState.dui, onValueChange = onDuiChange, keyboardType = KeyboardType.Number)
-        FormTextField(label = "Dirección (Opcional)", value = uiState.direccion, onValueChange = onDireccionChange, singleLine = false, modifier = Modifier.height(100.dp))
-
-        // --- Mensaje de Error (CORREGIDO) ---
-        uiState.error?.let { error ->
+        fieldErrorText("fecha")?.let { msg ->
             Text(
-                text = error,
+                text = msg,
+                color = MaterialTheme.colorScheme.error,
+                fontSize = 12.sp,
+                modifier = Modifier.fillMaxWidth().padding(bottom = 8.dp),
+                textAlign = TextAlign.Start
+            )
+        }
+
+        // Contraseña
+        FormTextField(
+            label = "Contraseña (mín 8 caracteres) (*)",
+            value = uiState.password,
+            onValueChange = onPasswordChange,
+            keyboardType = KeyboardType.Password,
+            isError = fieldHasError("contraseña"),
+            trailingIcon = {
+                IconButton(onClick = { showPassword = !showPassword }) {
+                    Icon(
+                        imageVector = if (showPassword) Icons.Default.Visibility else Icons.Default.VisibilityOff,
+                        contentDescription = if (showPassword) "Ocultar contraseña" else "Mostrar contraseña"
+                    )
+                }
+            },
+            visualTransformation = if (showPassword) VisualTransformation.None else PasswordVisualTransformation()
+        )
+        fieldErrorText("contraseña")?.let { msg ->
+            Text(text = msg, color = MaterialTheme.colorScheme.error, fontSize = 12.sp, modifier = Modifier.fillMaxWidth().padding(bottom = 8.dp))
+        }
+
+        // Confirmar contraseña
+        FormTextField(
+            label = "Confirmar Contraseña (*)",
+            value = uiState.confirmPassword,
+            onValueChange = onConfirmPasswordChange,
+            keyboardType = KeyboardType.Password,
+            isError = fieldHasError("confirmación") || fieldHasError("contraseña"),
+            trailingIcon = {
+                IconButton(onClick = { showConfirmPassword = !showConfirmPassword }) {
+                    Icon(
+                        imageVector = if (showConfirmPassword) Icons.Default.Visibility else Icons.Default.VisibilityOff,
+                        contentDescription = if (showConfirmPassword) "Ocultar" else "Mostrar"
+                    )
+                }
+            },
+            visualTransformation = if (showConfirmPassword) VisualTransformation.None else PasswordVisualTransformation()
+        )
+
+        // Opcionales validados
+        FormTextField(
+            label = "Teléfono (Opcional) - formato 1234-5678",
+            value = uiState.telefono,
+            onValueChange = onTelefonoChange,
+            keyboardType = KeyboardType.Phone,
+            isError = fieldHasError("teléfono") || fieldHasError("telefono"),
+            errorText = fieldErrorText("teléfono") ?: fieldErrorText("telefono")
+        )
+
+        FormTextField(
+            label = "DUI (Opcional) - formato 12345678-9",
+            value = uiState.dui,
+            onValueChange = onDuiChange,
+            keyboardType = KeyboardType.Number,
+            isError = fieldHasError("dui"),
+            errorText = fieldErrorText("dui")
+        )
+
+        FormTextField(
+            label = "Dirección (Opcional)",
+            value = uiState.direccion,
+            onValueChange = onDireccionChange,
+            singleLine = false,
+            modifier = Modifier.height(100.dp),
+            isError = fieldHasError("dirección") || fieldHasError("direccion"),
+            errorText = fieldErrorText("dirección") ?: fieldErrorText("direccion")
+        )
+
+        // Mensaje central breve (amable o técnico)
+        val centralMessage = uiState.validationError ?: uiState.error
+        centralMessage?.let {
+            Text(
+                text = it,
                 color = MaterialTheme.colorScheme.error,
                 fontSize = 14.sp,
-                modifier = Modifier.padding(vertical = 8.dp).fillMaxWidth(),
+                modifier = Modifier
+                    .padding(vertical = 8.dp)
+                    .fillMaxWidth(),
                 textAlign = TextAlign.Center
             )
         }
-        Spacer(modifier = Modifier.height(if (uiState.error == null) 16.dp else 8.dp))
-        // ---------------------------------
 
-        // --- Botón REGISTRARSE (CORREGIDO) ---
+        Spacer(modifier = Modifier.height(6.dp))
+
+        // Botón Registrar
         Button(
             onClick = onRegisterClick,
             enabled = !uiState.isLoading,
             modifier = Modifier
                 .fillMaxWidth()
-                .height(50.dp),
+                .height(52.dp),
             colors = ButtonDefaults.buttonColors(containerColor = Color(0xFF2D1B4E)),
-            shape = RoundedCornerShape(8.dp)
-        ){
+            shape = RoundedCornerShape(10.dp)
+        ) {
             if (uiState.isLoading) {
-                CircularProgressIndicator(Modifier.size(24.dp), color = Color.White, strokeWidth = 3.dp)
+                CircularProgressIndicator(modifier = Modifier.size(22.dp), color = Color.White, strokeWidth = 3.dp)
             } else {
                 Text("REGISTRARSE", color = Color.White, fontSize = 14.sp, fontWeight = FontWeight.Bold)
             }
         }
-        // ---------------------------------
 
-        Spacer(modifier = Modifier.height(24.dp))
+        Spacer(modifier = Modifier.height(18.dp))
 
-        // --- Texto de login (CORREGIDO) ---
         Row(
             horizontalArrangement = Arrangement.Center,
             verticalAlignment = Alignment.CenterVertically
@@ -208,12 +334,55 @@ fun RegisterScreen(
                 Text("Inicia sesión", color = Color(0xFF2D1B4E), fontSize = 14.sp, fontWeight = FontWeight.Bold)
             }
         }
-        Spacer(modifier = Modifier.height(24.dp))
-        // ------------------------------
-    } // Fin Column
-} // Fin RegisterScreen
 
-// --- FormTextField (CORREGIDO) ---
+        Spacer(modifier = Modifier.height(24.dp))
+    }
+
+    // --- Modal amable con TODOS los errores (detallados) ---
+    if (uiState.showErrorDialog) {
+        val title = uiState.validationError ?: "Hay algunos problemas"
+        val details = if (uiState.validationErrorsList.isNotEmpty()) {
+            uiState.validationErrorsList.joinToString("\n") { "• $it" }
+        } else {
+            uiState.error ?: "Ocurrió un problema. Intenta de nuevo."
+        }
+
+        AlertDialog(
+            onDismissRequest = { onDismissErrorDialog() },
+            title = { Text(text = title, fontWeight = FontWeight.SemiBold) },
+            text = {
+                Column {
+                    Text(text = details, fontSize = 14.sp, maxLines = 12, overflow = TextOverflow.Ellipsis)
+                    Spacer(modifier = Modifier.height(8.dp))
+                    Text(text = "Si necesitas ayuda, contacta al soporte.", fontSize = 12.sp, color = Color.Gray)
+                }
+            },
+            confirmButton = {
+                TextButton(onClick = { onDismissErrorDialog() }) {
+                    Text("Entendido")
+                }
+            }
+        )
+    }
+
+    // --- Modal de éxito ---
+    if (uiState.registerSuccess) {
+        AlertDialog(
+            onDismissRequest = { /* la navegación ya ocurre en LaunchedEffect */ },
+            title = { Text("Registro exitoso", fontWeight = FontWeight.SemiBold) },
+            text = { Text("¡Bienvenido! Tu cuenta fue creada correctamente. Se te redirigirá ahora.") },
+            confirmButton = {
+                TextButton(onClick = { /* navegación manejada arriba */ }) {
+                    Text("Continuar")
+                }
+            }
+        )
+    }
+}
+
+/**
+ * Composable reutilizable para campos con soporte de error inline y trailing icon opcional.
+ */
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 private fun FormTextField(
@@ -227,43 +396,99 @@ private fun FormTextField(
     readOnly: Boolean = false,
     enabled: Boolean = true,
     trailingIcon: @Composable (() -> Unit)? = null,
-    // Define colores por defecto
-    colors: TextFieldColors = OutlinedTextFieldDefaults.colors(
-        focusedBorderColor = if (isError) Color.Red else Color(0xFF2D1B4E),
-        unfocusedBorderColor = if (isError) Color.Red else Color.LightGray,
-        focusedContainerColor = Color.White,
-        unfocusedContainerColor = Color.White,
-        errorBorderColor = Color.Red,
-        // Añade colores para deshabilitado (para el campo de fecha)
-        disabledBorderColor = if (isError) Color.Red else Color.LightGray,
-        disabledTextColor = if (isError) Color.Red else Color.Black,
-        disabledLabelColor = if (isError) Color.Red else Color.Black,
-        disabledTrailingIconColor = if (isError) Color.Red else Color.Black,
-        disabledContainerColor = Color.White
-    )
+    visualTransformation: VisualTransformation = VisualTransformation.None,
+    errorText: String? = null
 ) {
-    Column(modifier = modifier.padding(bottom = 16.dp)) {
+    Column(modifier = modifier
+        .fillMaxWidth()
+        .padding(bottom = 8.dp)
+    ) {
         Text(
             text = label,
-            fontSize = 14.sp,
+            fontSize = 13.sp,
             color = Color.Black,
             fontWeight = FontWeight.Medium,
-            modifier = Modifier.padding(bottom = 8.dp)
+            modifier = Modifier.padding(bottom = 6.dp)
         )
+
         OutlinedTextField(
             value = value,
             onValueChange = onValueChange,
             modifier = Modifier.fillMaxWidth(),
-            colors = colors, // Usa el parámetro de colores
             shape = RoundedCornerShape(8.dp),
             singleLine = singleLine,
-            visualTransformation = if (keyboardType == KeyboardType.Password) PasswordVisualTransformation() else VisualTransformation.None,
+            visualTransformation = visualTransformation,
             keyboardOptions = KeyboardOptions(keyboardType = keyboardType),
             isError = isError,
             readOnly = readOnly,
             enabled = enabled,
-            trailingIcon = trailingIcon
+            trailingIcon = trailingIcon,
+            colors = OutlinedTextFieldDefaults.colors(
+                focusedBorderColor = if (isError) MaterialTheme.colorScheme.error else Color(0xFF2D1B4E),
+                unfocusedBorderColor = if (isError) MaterialTheme.colorScheme.error else Color.LightGray,
+                errorBorderColor = MaterialTheme.colorScheme.error,
+                focusedLabelColor = if (isError) MaterialTheme.colorScheme.error else Color.Black
+            )
         )
+
+        if (!errorText.isNullOrBlank()) {
+            Text(
+                text = errorText,
+                color = MaterialTheme.colorScheme.error,
+                fontSize = 12.sp,
+                modifier = Modifier.padding(top = 6.dp)
+            )
+        }
     }
 }
-// --- -------------------- ---
+
+@Preview(showBackground = true)
+@Composable
+private fun PreviewRegisterScreen() {
+    // Preview: crear NavController con contexto válido para evitar NullPointerException
+    val ctx = LocalContext.current
+    val previewNav = remember { NavHostController(ctx) }
+
+    val dummyState = RegisterUiState(
+        primerNombre = "",
+        segundoNombre = "",
+        primerApellido = "",
+        segundoApellido = "",
+        email = "",
+        username = "",
+        fechaNacimiento = "",
+        password = "",
+        confirmPassword = "",
+        telefono = "",
+        dui = "",
+        direccion = "",
+        isLoading = false,
+        registerSuccess = false,
+        error = null,
+        validationError = null,
+        validationErrorsList = emptyList(),
+        showErrorDialog = false,
+        showCalendarDialog = false
+    )
+
+    RegisterScreen(
+        navController = previewNav,
+        uiState = dummyState,
+        onPrimerNombreChange = {},
+        onSegundoNombreChange = {},
+        onPrimerApellidoChange = {},
+        onSegundoApellidoChange = {},
+        onEmailChange = {},
+        onUsernameChange = {},
+        onPasswordChange = {},
+        onConfirmPasswordChange = {},
+        onTelefonoChange = {},
+        onDuiChange = {},
+        onDireccionChange = {},
+        onRegisterClick = {},
+        onFechaNacimientoClicked = {},
+        onCalendarDismiss = {},
+        onDateSelected = {},
+        onDismissErrorDialog = {}
+    )
+}

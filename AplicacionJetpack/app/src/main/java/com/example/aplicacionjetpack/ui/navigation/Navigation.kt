@@ -38,25 +38,28 @@ fun AppNavigation() {
         }
 
         composable("register") {
-            val viewModel: RegisterViewModel = hiltViewModel()
+            // obtiene la instancia correcta del ViewModel con Hilt
+            val registerViewModel: RegisterViewModel = hiltViewModel()
+
             RegisterScreen(
                 navController = navController,
-                uiState = viewModel.uiState,
-                onPrimerNombreChange = viewModel::onPrimerNombreChange,
-                onPrimerApellidoChange = viewModel::onPrimerApellidoChange,
-                onFechaNacimientoClicked = viewModel::onFechaNacimientoClicked,
-                onCalendarDismiss = viewModel::onCalendarDismiss,
-                onDateSelected = viewModel::onDateSelected,
-                onEmailChange = viewModel::onEmailChange,
-                onUsernameChange = viewModel::onUsernameChange,
-                onPasswordChange = viewModel::onPasswordChange,
-                onConfirmPasswordChange = viewModel::onConfirmPasswordChange,
-                onTelefonoChange = viewModel::onTelefonoChange,
-                onDuiChange = viewModel::onDuiChange,
-                onDireccionChange = viewModel::onDireccionChange,
-                onSegundoNombreChange = viewModel::onSegundoNombreChange,
-                onSegundoApellidoChange = viewModel::onSegundoApellidoChange,
-                onRegisterClick = viewModel::onRegisterClicked
+                uiState = registerViewModel.uiState,
+                onPrimerNombreChange = registerViewModel::onPrimerNombreChange,
+                onSegundoNombreChange = registerViewModel::onSegundoNombreChange,
+                onPrimerApellidoChange = registerViewModel::onPrimerApellidoChange,
+                onSegundoApellidoChange = registerViewModel::onSegundoApellidoChange,
+                onEmailChange = registerViewModel::onEmailChange,
+                onUsernameChange = registerViewModel::onUsernameChange,
+                onPasswordChange = registerViewModel::onPasswordChange,
+                onConfirmPasswordChange = registerViewModel::onConfirmPasswordChange,
+                onTelefonoChange = registerViewModel::onTelefonoChange,
+                onDuiChange = registerViewModel::onDuiChange,
+                onDireccionChange = registerViewModel::onDireccionChange,
+                onRegisterClick = registerViewModel::onRegisterClicked,
+                onFechaNacimientoClicked = registerViewModel::onFechaNacimientoClicked,
+                onCalendarDismiss = registerViewModel::onCalendarDismiss,
+                onDateSelected = registerViewModel::onDateSelected,
+                onDismissErrorDialog = registerViewModel::dismissErrorDialog
             )
         }
 
