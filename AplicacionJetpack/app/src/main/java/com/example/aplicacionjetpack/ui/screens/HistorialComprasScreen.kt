@@ -19,29 +19,31 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.navigation.NavController
-import com.example.aplicacionjetpack.data.dto.HistorialPedidoResponse // <-- Usa TU DTO
+// --- 👇👇👇 ¡¡¡LOS IMPORTS CORRECTOS DE LA VICTORIA!!! 👇👇👇 ---
+import com.example.aplicacionjetpack.data.dto.HistorialPedidoResponse
 import com.example.aplicacionjetpack.ui.theme.PurpleDark
-import com.example.aplicacionjetpack.ui.viewmodel.HistorialViewModel
+import com.example.aplicacionjetpack.ui.viewmodel.HistorialPedidoViewModel // ¡EL NOMBRE CORRECTO!
+// --- ------------------------------------------------------------- ---
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun HistorialComprasScreen(
     navController: NavController,
-    viewModel: HistorialViewModel = hiltViewModel()
+    // --- 👇 ¡USAMOS EL VIEWMODEL CON EL NOMBRE CORRECTO! 👇 ---
+    viewModel: HistorialPedidoViewModel = hiltViewModel()
 ) {
     val uiState = viewModel.uiState
-
-    // El ViewModel ya carga los datos en su 'init', no se necesita LaunchedEffect aquí.
 
     Scaffold(
         topBar = {
             TopAppBar(
-                title = { Text("Historial de Compras") },
+                title = { Text("Historial de Compras", color = PurpleDark, fontWeight = FontWeight.SemiBold) },
                 navigationIcon = {
                     IconButton(onClick = { navController.navigateUp() }) {
-                        Icon(Icons.Default.ArrowBack, "Atrás")
+                        Icon(Icons.Default.ArrowBack, "Atrás", tint = PurpleDark)
                     }
-                }
+                },
+                colors = TopAppBarDefaults.topAppBarColors(containerColor = Color.White)
             )
         }
     ) { padding ->
@@ -54,7 +56,7 @@ fun HistorialComprasScreen(
             when {
                 uiState.isLoading -> {
                     Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
-                        CircularProgressIndicator()
+                        CircularProgressIndicator(color = PurpleDark)
                     }
                 }
                 uiState.error != null -> {
@@ -67,7 +69,8 @@ fun HistorialComprasScreen(
                         )
                     }
                 }
-                uiState.historial.isEmpty() -> {
+                // --- 👇 ¡LA UI STATE USA 'pedidos', NO 'historial'! 👇 ---
+                uiState.pedidos.isEmpty() -> {
                     Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
                         Column(horizontalAlignment = Alignment.CenterHorizontally, modifier = Modifier.padding(16.dp)) {
                             Icon(Icons.Default.History, "Sin Historial", modifier = Modifier.size(64.dp), tint = Color.Gray)
@@ -81,12 +84,12 @@ fun HistorialComprasScreen(
                         contentPadding = PaddingValues(16.dp),
                         verticalArrangement = Arrangement.spacedBy(12.dp)
                     ) {
-                        // --- 👇👇👇 ¡¡¡LA CORRECCIÓN DEFINITIVA!!! 👇👇👇 ---
-                        // Usamos los campos correctos de TU DTO: 'idHistorialPedido' y 'idPedido'
-                        items(uiState.historial, key = { it.idHistorialPedido }) { historialItem ->
-                            HistorialCard(item = historialItem)
+                        // --- 👇👇👇 ¡¡¡LA KEY ÚNICA Y DEFINITIVA QUE EVITA EL CRASH!!! 👇👇👇 ---
+                        // Usamos 'idHistorialPedido' que SÍ es único para cada entrada.
+                        items(uiState.pedidos, key = { it.idHistorialPedido }) { pedidoItem ->
+                            HistorialCard(item = pedidoItem)
                         }
-                        // --- -------------------------------------------- ---
+                        // --- ------------------------------------------------------------------ ---
                     }
                 }
             }
@@ -111,7 +114,8 @@ private fun HistorialCard(item: HistorialPedidoResponse) {
         ) {
             Column(modifier = Modifier.weight(1f)) {
                 Text(
-                    text = "Pedido #${item.idPedido}", // <-- CAMPO CORRECTO
+                    // Mostramos el ID del pedido, aunque la key de la lista sea otra.
+                    text = "Pedido #${item.idPedido}",
                     fontWeight = FontWeight.Bold,
                     color = PurpleDark,
                     fontSize = 16.sp
@@ -124,7 +128,7 @@ private fun HistorialCard(item: HistorialPedidoResponse) {
                 )
             }
             Text(
-                text = item.fecha,
+                text = item.fecha, // 'fecha' sí existe y es correcto
                 style = MaterialTheme.typography.labelSmall,
                 color = Color.Gray
             )
