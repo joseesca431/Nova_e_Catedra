@@ -9,12 +9,12 @@ import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
+// --- 👇¡¡¡LAS IMPORTACIONES CORRECTAS DE LA VICTORIA!!!👇 ---
 import androidx.compose.material.icons.filled.ArrowDropDown
 import androidx.compose.material.icons.filled.ArrowDropUp
+// -------------------------------------------------------------
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
-import androidx.compose.runtime.getValue
-import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
@@ -30,9 +30,7 @@ import com.example.adminappnova.data.dto.PedidoResponse
 import com.example.adminappnova.ui.viewmodel.PedidosUiState
 import com.google.accompanist.swiperefresh.SwipeRefresh
 import com.google.accompanist.swiperefresh.rememberSwipeRefreshState
-
-// ¡¡¡EL CÓDIGO DEL OrderDetailViewModel HA SIDO ANIQUILADO DE AQUÍ!!!
-// ESTE ARCHIVO AHORA ESTÁ LIMPIO.
+import java.util.Locale
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -108,6 +106,7 @@ fun PedidosScreen(
                         onValueChange = {},
                         readOnly = true,
                         label = { Text("Filtrar por estado") },
+                        // --- 👇 ¡ICONOS CORREGIDOS! 👇 ---
                         trailingIcon = { Icon(if (isDropdownExpanded) Icons.Filled.ArrowDropUp else Icons.Filled.ArrowDropDown, "Abrir/Cerrar menú") },
                         colors = OutlinedTextFieldDefaults.colors(
                             focusedContainerColor = Color.White,
@@ -116,6 +115,7 @@ fun PedidosScreen(
                             focusedBorderColor = Color(0xFF2D1B4E),
                             unfocusedBorderColor = Color.Gray
                         ),
+                        // --- 👇 ¡MODIFICADOR CORREGIDO! 👇 ---
                         modifier = Modifier.menuAnchor().fillMaxWidth()
                     )
                     ExposedDropdownMenu(
@@ -202,6 +202,21 @@ fun PedidosScreen(
     }
 }
 
+// El resto del archivo (PedidoCard, estadoColor, estadoToString) no necesita cambios
+// ... (resto del archivo)
+fun estadoColor(estado: EstadoPedido?): Color {
+    val name = estado?.name?.uppercase(Locale.getDefault()) ?: ""
+    return when (name) {
+        "CARRITO" -> Color(0xFF78909C)
+        "PENDIENTE" -> Color(0xFFFFA726)
+        "PAGADO" -> Color(0xFF66BB6A)
+        "EN_PROCESO", "ENPROCESO", "EN PROCESO" -> Color(0xFFAB47BC)
+        "ENVIADO" -> Color(0xFF29B6F6)
+        "ENTREGADO" -> Color(0xFF2E7D32)
+        "CANCELADO" -> Color(0xFFEF5350)
+        else -> Color.Gray
+    }
+}
 @Composable
 fun PedidoCard(pedido: PedidoResponse, onClick: () -> Unit) {
     Card(
@@ -224,19 +239,6 @@ fun PedidoCard(pedido: PedidoResponse, onClick: () -> Unit) {
     }
 }
 
-@Composable
-fun estadoColor(estado: EstadoPedido?): Color {
-    return when (estado) {
-        EstadoPedido.CARRITO -> Color(0xFF78909C)
-        EstadoPedido.PENDIENTE -> Color(0xFFFFA726)
-        EstadoPedido.PAGADO -> Color(0xFF66BB6A)
-        EstadoPedido.EN_PROCESO -> Color(0xFFAB47BC)
-        EstadoPedido.ENVIADO -> Color(0xFF29B6F6)
-        EstadoPedido.ENTREGADO -> Color(0xFFBDBDBD)
-        EstadoPedido.CANCELADO -> Color(0xFFEF5350)
-        else -> Color.Gray
-    }
-}
 
 private fun estadoToString(estado: EstadoPedido?): String {
     return estado?.name?.replace("_", " ")?.lowercase()?.replaceFirstChar { if (it.isLowerCase()) it.titlecase() else it.toString() } ?: "Todos"

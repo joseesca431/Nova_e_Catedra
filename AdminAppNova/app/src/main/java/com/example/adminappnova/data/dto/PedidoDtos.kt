@@ -28,8 +28,7 @@ data class PedidoResponse(
     val calleDireccion: String?,
     val ciudadDireccion: String?,
     val departamentoDireccion: String?,
-    // ¡LA CLAVE! 'var' para poder ser modificado después de la creación inicial por el deserializador.
-    var idUser: Long? = null // <--- ¡¡AÑADE ESTA LÍNEA DE NUEVO!!
+    val idUser: Long? = null // <- necesario
 )
 
 

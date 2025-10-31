@@ -41,6 +41,7 @@ class HateoasPagedResponseDeserializer<T> : JsonDeserializer<PagedResponse<T>> {
                             // Añadimos el idUser al objeto JSON antes de que Gson lo convierta
                             if (userId != null) {
                                 itemObject.addProperty("idUser", userId)
+                                android.util.Log.d("HateoasDeserializer", "Inyectado idUser=$userId en pedido ${itemObject.get("idPedido")}")
                             }
                         } catch (e: Exception) {
                             // Ignora si la estructura de links no es la esperada

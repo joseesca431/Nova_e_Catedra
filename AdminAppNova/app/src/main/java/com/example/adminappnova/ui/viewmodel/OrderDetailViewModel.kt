@@ -17,10 +17,12 @@ import kotlinx.coroutines.async
 import kotlinx.coroutines.launch
 import javax.inject.Inject
 
+private const val TAG = "OrderDetailVM"
+
 data class OrderDetailUiState(
     val pedido: PedidoResponse? = null,
-    val pedidoItems: List<PedidoItemDto> = emptyList(),
     val usuario: UserResponse? = null,
+    val pedidoItems: List<PedidoItemDto> = emptyList(),
     val isLoading: Boolean = true,
     val isUpdatingStatus: Boolean = false,
     val error: String? = null,
@@ -33,121 +35,114 @@ class OrderDetailViewModel @Inject constructor(
     savedStateHandle: SavedStateHandle
 ) : ViewModel() {
 
+    // UI state expuesto como property mutable (Compose-friendly)
     var uiState by mutableStateOf(OrderDetailUiState())
         private set
 
-    // --- CAMBIO 1 ---
-    // Añadido PAGADO y quitado ENVIADO para que coincida con la API
     val estadosSeleccionables = listOf(
+        EstadoPedido.PENDIENTE,
         EstadoPedido.PAGADO,
         EstadoPedido.EN_PROCESO,
+        EstadoPedido.ENVIADO,
         EstadoPedido.ENTREGADO,
         EstadoPedido.CANCELADO
     )
 
-    private val pedidoId: Long = savedStateHandle.get<Long>("pedidoId") ?: 0L
-    private val userId: Long = savedStateHandle.get<Long>("userId") ?: 0L
-
-    private val TAG = "OrderDetailVM"
+    // Leemos los argumentos de navegación (definidos como Long en NavGraph)
+    private val pedidoId: Long = try {
+        savedStateHandle.get<Long>("pedidoId") ?: (savedStateHandle.get<String>("pedidoId")?.toLongOrNull() ?: 0L)
+    } catch (e: Exception) {
+        0L
+    }
+    private val userId: Long = try {
+        savedStateHandle.get<Long>("userId") ?: (savedStateHandle.get<String>("userId")?.toLongOrNull() ?: 0L)
+    } catch (e: Exception) {
+        0L
+    }
 
     init {
         if (pedidoId != 0L && userId != 0L) {
             loadOrderDetails()
         } else {
             uiState = uiState.copy(isLoading = false, error = "ID de pedido o usuario inválido.")
+            Log.w(TAG, "IDs inválidos: pedidoId=$pedidoId userId=$userId")
         }
     }
 
-    private fun loadOrderDetails() {
+    fun loadOrderDetails() {
         viewModelScope.launch {
-            uiState = OrderDetailUiState(isLoading = true)
-            Log.d(TAG, "Iniciando carga de detalles REALES para pedido ID: $pedidoId")
-
+            uiState = uiState.copy(isLoading = true, error = null)
             try {
                 val pedidoDeferred = async { pedidoRepository.getPedidoById(pedidoId) }
-                val userDeferred = async { pedidoRepository.getUserById(userId) }
+                val usuarioDeferred = async { pedidoRepository.getUserById(userId) }
                 val itemsDeferred = async { pedidoRepository.getPedidoItems(pedidoId) }
 
-                // Esperamos los resultados
-                val pedido = pedidoDeferred.await().getOrThrow()
-                val usuario = userDeferred.await().getOrThrow()
-                val items = itemsDeferred.await().getOrThrow()
+                val pedidoResult = pedidoDeferred.await()
+                val usuarioResult = usuarioDeferred.await()
+                val itemsResult = itemsDeferred.await()
 
-                Log.d(TAG, "Carga exitosa. Pedido: ${pedido.idPedido}, Usuario: ${usuario.username}, Items REALES: ${items.size}")
+                // Asumo que tus repos retornan Result<T> o directamente el objeto; adaptalo:
+                val pedido = if (pedidoResult is Result<*>) (pedidoResult as Result<PedidoResponse>).getOrNull() else (pedidoResult as? PedidoResponse)
+                val usuario = if (usuarioResult is Result<*>) (usuarioResult as Result<UserResponse>).getOrNull() else (usuarioResult as? UserResponse)
+                val items = if (itemsResult is Result<*>) (itemsResult as Result<List<PedidoItemDto>>).getOrNull() else (itemsResult as? List<PedidoItemDto>)
 
                 uiState = uiState.copy(
                     isLoading = false,
                     pedido = pedido,
                     usuario = usuario,
-                    pedidoItems = items
+                    pedidoItems = items ?: emptyList()
                 )
 
+                Log.d(TAG, "Carga exitosa. Pedido: ${pedido?.idPedido ?: "null"}, Usuario: ${usuario?.idUser ?: "null"}, Items: ${uiState.pedidoItems.size}")
+
             } catch (e: Exception) {
-                Log.e(TAG, "Error cargando detalles completos del pedido: ", e)
-                uiState = uiState.copy(isLoading = false, error = "No se pudieron cargar los detalles completos del pedido.")
+                Log.e(TAG, "Error cargando detalles: ", e)
+                uiState = uiState.copy(isLoading = false, error = "No se pudieron cargar los detalles.")
             }
         }
     }
 
-    // --- CAMBIO 2 ---
-    // Función 'cambiarEstado' con la lógica del 'when' corregida
+    // Función para cambiar estado (actualiza uiState)
     fun cambiarEstado(nuevoEstado: EstadoPedido, motivo: String? = null) {
-        // 1. Evita clics duplicados si ya se está actualizando
         if (uiState.isUpdatingStatus) return
 
-        // 2. Obtiene el ID del pedido. Si es nulo, muestra error y sale.
         val currentPedidoId = uiState.pedido?.idPedido ?: run {
             uiState = uiState.copy(actionError = "Error: No se encontró el ID del pedido.")
             return
         }
 
         viewModelScope.launch {
-            // 3. Pone la UI en estado de carga y limpia errores viejos
             uiState = uiState.copy(isUpdatingStatus = true, actionError = null)
             Log.d(TAG, "Intentando cambiar estado a $nuevoEstado para pedido $currentPedidoId")
 
-            // 4. Determina qué llamada al repositorio hacer
-            //    !! LÓGICA CORREGIDA !!
-            val result: Result<PedidoResponse> = when (nuevoEstado) {
-
-                // Esta es la llamada que devuelve "PAGADO"
-                EstadoPedido.PAGADO -> pedidoRepository.confirmarPedido(currentPedidoId)
-
-                // Esta es la llamada que devuelve "EN_PROCESO"
-                EstadoPedido.EN_PROCESO -> pedidoRepository.iniciarEnvio(currentPedidoId)
-
-                // Esta ya funcionaba bien
-                EstadoPedido.ENTREGADO -> pedidoRepository.marcarEntregado(currentPedidoId)
-
-                // Esta es la llamada correcta
-                EstadoPedido.CANCELADO -> {
-                    if (motivo.isNullOrBlank()) {
-                        Result.failure(IllegalArgumentException("El motivo es obligatorio para cancelar."))
-                    } else {
+            val result = try {
+                when (nuevoEstado) {
+                    EstadoPedido.PAGADO -> pedidoRepository.confirmarPedido(currentPedidoId)
+                    EstadoPedido.EN_PROCESO -> pedidoRepository.iniciarEnvio(currentPedidoId)
+                    EstadoPedido.ENTREGADO -> pedidoRepository.marcarEntregado(currentPedidoId)
+                    EstadoPedido.CANCELADO -> {
+                        if (motivo.isNullOrBlank()) throw IllegalArgumentException("El motivo es obligatorio para cancelar.")
                         pedidoRepository.cancelarPedido(currentPedidoId, motivo)
                     }
+                    else -> throw IllegalArgumentException("Estado no soportado: $nuevoEstado")
                 }
-
-                // Cualquier otro estado (como ENVIADO) no está soportado
-                else -> Result.failure(IllegalArgumentException("Estado no soportado: $nuevoEstado"))
+            } catch (ex: Exception) {
+                Log.e(TAG, "Error en petición cambiarEstado", ex)
+                null
             }
 
-
-            // 6. Maneja el resultado de la llamada
-            result.onSuccess { pedidoActualizado ->
-                // ¡ÉXITO! Actualiza la UI con el pedido que retornó la API
-                Log.d(TAG, "Estado cambiado exitosamente a: ${pedidoActualizado.estado}")
-                uiState = uiState.copy(
-                    isUpdatingStatus = false,
-                    pedido = pedidoActualizado // <-- Aquí se actualiza la pantalla
-                )
-            }.onFailure { exception ->
-                // FALLO: Muestra el error en el Snackbar
-                Log.e(TAG, "Error al cambiar estado a $nuevoEstado", exception)
-                uiState = uiState.copy(
-                    isUpdatingStatus = false,
-                    actionError = "Error: ${exception.message}"
-                )
+            // Manejo del resultado (adapta según tu repo devuelva Result<T> o T)
+            if (result is Result<*>) {
+                result.onSuccess { newPedido ->
+                    val p = newPedido as? PedidoResponse
+                    uiState = uiState.copy(isUpdatingStatus = false, pedido = p)
+                }.onFailure { ex ->
+                    uiState = uiState.copy(isUpdatingStatus = false, actionError = "Error: ${ex.message}")
+                }
+            } else if (result is PedidoResponse) {
+                uiState = uiState.copy(isUpdatingStatus = false, pedido = result)
+            } else {
+                uiState = uiState.copy(isUpdatingStatus = false, actionError = "No se pudo cambiar el estado.")
             }
         }
     }

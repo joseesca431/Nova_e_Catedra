@@ -1,15 +1,18 @@
 package com.example.adminappnova.data.dto
 
-// Para UserResponse
+import com.google.gson.annotations.SerializedName
+
 data class UserResponse(
+    @SerializedName(value = "idUser", alternate = ["id"])
     val idUser: Long,
-    val primerNombre: String,
-    val primerApellido: String,
-    val email: String,
-    val username: String,
-    val role: String // Asumiendo que conviertes el Rol a un String
-    // Agrega los demás campos
+    val primerNombre: String? = null,
+    val primerApellido: String? = null,
+    val email: String? = null,
+    val username: String? = null,
+    @SerializedName("roleName")
+    val role: String? = null
 )
+
 
 // Para UserCreateRequest
 data class UserCreateRequest(

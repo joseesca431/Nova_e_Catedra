@@ -1,5 +1,6 @@
 package com.example.adminappnova.ui.screens
 
+import android.util.Log
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
@@ -8,8 +9,6 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.ArrowBack
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
-import androidx.compose.runtime.getValue
-import androidx.compose.runtime.collectAsState
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
@@ -26,34 +25,33 @@ import java.math.BigDecimal
 import java.text.NumberFormat
 import java.util.Locale
 
-// COLORES
+// Colores del tema local (puedes moverlos a un archivo común)
 private val PrimaryPurple = Color(0xFF2D1B4E)
 private val AccentOrange = Color(0xFFFF6B35)
 private val BackgroundGray = Color(0xFFF5F5F5)
 
+/**
+ * Pantalla de detalles del pedido.
+ * Asume que OrderDetailViewModel expone:
+ *   var uiState by mutableStateOf(OrderDetailUiState(...))
+ * y funciones: loadOrderDetails(), cambiarEstado(...)
+ */
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun DetallesPagoScreen(
     navController: NavController,
     viewModel: OrderDetailViewModel = hiltViewModel()
 ) {
-    // ---------- LECTURA DEL UI STATE ----------
-    // Importante: viewModel.uiState debe ser public StateFlow<OrderDetailUiState>
-    //
-    // !! CORRECCIÓN !!
-    // Los errores "Receiver type mismatch" indican que viewModel.uiState es un Flow<T>
-    // y no un StateFlow<T>. Un Flow<T> REQUIERE un valor inicial.
-    //
-    // Aquí usamos 'OrderDetailUiState()' como estado inicial.
-    // Esta clase de 'data' está definida al final de este archivo como placeholder.
-    // Si ya tienes esta clase definida en tu ViewModel, puedes borrar
-    // la de este archivo (pero asegúrate de que tenga valores por defecto).
-    // CORRECTO (Línea 51)
+    // LEEMOS directamente la propiedad uiState del ViewModel
     val uiState = viewModel.uiState
-
 
     val snackbarHostState = remember { SnackbarHostState() }
     var showDialog by remember { mutableStateOf(false) }
+
+    // Cargar datos la primera vez (el ViewModel ya extrae ids del SavedStateHandle)
+    LaunchedEffect(Unit) {
+        viewModel.loadOrderDetails()
+    }
 
     Scaffold(
         topBar = {
@@ -67,9 +65,11 @@ fun DetallesPagoScreen(
                 colors = TopAppBarDefaults.topAppBarColors(containerColor = PrimaryPurple)
             )
         },
-        containerColor = BackgroundGray
+        containerColor = BackgroundGray,
+        snackbarHost = { SnackbarHost(hostState = snackbarHostState) }
     ) { padding ->
         when {
+            // Loading
             uiState.isLoading -> {
                 Box(
                     Modifier
@@ -81,6 +81,7 @@ fun DetallesPagoScreen(
                 }
             }
 
+            // Error general
             uiState.error != null -> {
                 Box(
                     Modifier
@@ -89,15 +90,13 @@ fun DetallesPagoScreen(
                         .padding(16.dp),
                     contentAlignment = Alignment.Center
                 ) {
-                    Text(
-                        text = uiState.error ?: "Error desconocido",
-                        color = Color.Red,
-                        textAlign = TextAlign.Center
-                    )
+                    Text(text = uiState.error ?: "Error desconocido", color = Color.Red, textAlign = TextAlign.Center)
                 }
             }
 
+            // Mostrar pedido cuando exista
             uiState.pedido != null -> {
+                val pedido = uiState.pedido!!
                 LazyColumn(
                     modifier = Modifier
                         .fillMaxSize()
@@ -105,38 +104,58 @@ fun DetallesPagoScreen(
                     contentPadding = PaddingValues(16.dp),
                     verticalArrangement = Arrangement.spacedBy(16.dp)
                 ) {
-                    // Resumen del pedido
                     item {
                         SectionCard(title = "Resumen del Pedido") {
-                            val pedido = uiState.pedido!!
+                            val estado = pedido.estado
                             DetailItem(
                                 "Estado:",
-                                pedido.estado?.name?.replace("_", " ") ?: "N/A",
+                                estado?.name?.replace("_", " ") ?: "N/A",
                                 highlight = true,
-                                highlightColor = pedidoEstadoColor(pedido.estado)
+                                highlightColor = estadoColor(estado)
                             )
-                            DetailItem("Fecha:", pedido.fechaInicio.substringBefore("T"))
+                            DetailItem("Fecha:", pedido.fechaInicio.substringBefore("T").ifEmpty { "N/A" })
                             DetailItem("Total:", formatCurrency(pedido.total))
                             DetailItem("Método de Pago:", pedido.tipoPago?.name?.replace("_", " ") ?: "N/A")
                         }
                     }
 
-                    // Información del cliente
                     item {
                         SectionCard(title = "Información del Cliente") {
                             val usuario = uiState.usuario
                             if (usuario != null) {
-                                DetailItem("Cliente ID:", usuario.idUser.toString())
-                                DetailItem("Nombre:", "${usuario.primerNombre} ${usuario.primerApellido}")
-                                DetailItem("Email:", usuario.email)
-                                DetailItem("Username:", usuario.username)
+                                val clienteIdStr = usuario.idUser.toString()
+                                val nombreCompleto = listOf(
+                                    usuario.primerNombre ?: "",
+                                    usuario.primerApellido ?: ""
+                                ).filter { it.isNotBlank() }.joinToString(" ").ifEmpty { "N/A" }
+
+                                DetailItem("Cliente ID:", clienteIdStr)
+                                DetailItem("Nombre:", nombreCompleto)
+                                DetailItem("Email:", usuario.email ?: "N/A")
+                                DetailItem("Username:", usuario.username ?: "N/A")
                             } else {
-                                Text("Cargando datos del cliente...")
+                                Text("Cargando datos del cliente...", color = Color.Gray)
                             }
                         }
                     }
 
-                    // Encabezado productos
+                    item {
+                        SectionCard(title = "Dirección de Envío") {
+                            val calle = pedido.calleDireccion
+                            if (!calle.isNullOrBlank()) {
+                                val aliasSafe = pedido.aliasDireccion ?: "N/A"
+                                val direccionSafe = "${pedido.calleDireccion ?: "N/A"}, ${pedido.ciudadDireccion ?: "N/A"}"
+                                val deptoSafe = pedido.departamentoDireccion ?: "N/A"
+
+                                DetailItem("Alias:", aliasSafe)
+                                DetailItem("Dirección:", direccionSafe)
+                                DetailItem("Departamento:", deptoSafe)
+                            } else {
+                                Text("Dirección no especificada en el pedido.", color = Color.Gray)
+                            }
+                        }
+                    }
+
                     item {
                         SectionCard(title = "Productos del Pedido") {
                             if (uiState.pedidoItems.isEmpty()) {
@@ -145,15 +164,11 @@ fun DetallesPagoScreen(
                         }
                     }
 
-                    // Lista de productos
-                    items(items = uiState.pedidoItems, key = { item -> item.idProducto }) { item ->
-                        Column(modifier = Modifier.padding(horizontal = 16.dp)) {
-                            ProductoItemRow(item)
-                            Divider(modifier = Modifier.padding(top = 8.dp), color = BackgroundGray)
-                        }
+                    items(items = uiState.pedidoItems, key = { it.idProducto }) { item ->
+                        ProductoItemRow(item = item)
+                        Divider(modifier = Modifier.padding(top = 8.dp))
                     }
 
-                    // Acciones
                     item {
                         SectionCard(title = "Acciones") {
                             Button(
@@ -164,11 +179,16 @@ fun DetallesPagoScreen(
                             ) {
                                 Text("Cambiar Estado del Pedido", fontWeight = FontWeight.Bold)
                             }
+                            Spacer(modifier = Modifier.height(8.dp))
+                            if (uiState.isUpdatingStatus) {
+                                Text("Actualizando estado...", fontSize = 12.sp, color = Color.Gray)
+                            }
                         }
                     }
                 }
             }
 
+            // fallback
             else -> {
                 Box(
                     Modifier
@@ -182,29 +202,28 @@ fun DetallesPagoScreen(
         }
     }
 
-    // Dialogo de cambio de estado
+    // Diálogo para cambiar estado
     if (showDialog) {
         ChangeStatusDialog(
             estados = viewModel.estadosSeleccionables,
             onDismiss = { showDialog = false },
             onConfirm = { nuevoEstado, motivo ->
+                // Llamada segura a la función del ViewModel (actualiza uiState ahí)
                 viewModel.cambiarEstado(nuevoEstado, motivo)
                 showDialog = false
             }
         )
     }
 
-    // Snackbar para actionError
-    uiState.actionError?.let { error ->
-        LaunchedEffect(error) {
-            snackbarHostState.showSnackbar(message = error, duration = SnackbarDuration.Short)
+    // Snackbar para errores de acción (actionError)
+    uiState.actionError?.let { ae ->
+        LaunchedEffect(ae) {
+            snackbarHostState.showSnackbar(ae)
         }
     }
-    SnackbarHost(hostState = snackbarHostState, modifier = Modifier.fillMaxWidth().padding(16.dp))
 }
 
-
-// -------------------- Auxiliares --------------------
+/* ---------- Composables auxiliares ---------- */
 
 @Composable
 private fun SectionCard(title: String, content: @Composable ColumnScope.() -> Unit) {
@@ -232,7 +251,13 @@ private fun DetailItem(label: String, value: String, highlight: Boolean = false,
 
 @Composable
 private fun ProductoItemRow(item: PedidoItemDto) {
-    Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween, verticalAlignment = Alignment.CenterVertically) {
+    Row(
+        modifier = Modifier
+            .fillMaxWidth()
+            .padding(vertical = 8.dp),
+        horizontalArrangement = Arrangement.SpaceBetween,
+        verticalAlignment = Alignment.CenterVertically
+    ) {
         Text(text = "${item.cantidad}x ${item.nombreProducto}", modifier = Modifier.weight(1f), maxLines = 2, color = Color.DarkGray, fontSize = 14.sp)
         Text(text = formatCurrency(item.precioUnitario), fontWeight = FontWeight.Medium, modifier = Modifier.padding(start = 12.dp), fontSize = 16.sp)
     }
@@ -250,7 +275,7 @@ private fun ChangeStatusDialog(estados: List<EstadoPedido>, onDismiss: () -> Uni
         onDismissRequest = onDismiss,
         title = { Text("Cambiar Estado del Pedido") },
         text = {
-            Column(verticalArrangement = Arrangement.spacedBy(16.dp)) {
+            Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
                 ExposedDropdownMenuBox(expanded = expanded, onExpandedChange = { expanded = it }) {
                     OutlinedTextField(
                         value = selectedEstado?.name?.replace("_", " ") ?: "Seleccionar...",
@@ -258,8 +283,7 @@ private fun ChangeStatusDialog(estados: List<EstadoPedido>, onDismiss: () -> Uni
                         readOnly = true,
                         label = { Text("Nuevo Estado") },
                         trailingIcon = { ExposedDropdownMenuDefaults.TrailingIcon(expanded = expanded) },
-                        modifier = Modifier.menuAnchor().fillMaxWidth(),
-                        colors = OutlinedTextFieldDefaults.colors(focusedBorderColor = PrimaryPurple, unfocusedBorderColor = Color.Gray)
+                        modifier = Modifier.menuAnchor().fillMaxWidth()
                     )
                     ExposedDropdownMenu(expanded = expanded, onDismissRequest = { expanded = false }) {
                         estados.forEach { estado ->
@@ -269,14 +293,20 @@ private fun ChangeStatusDialog(estados: List<EstadoPedido>, onDismiss: () -> Uni
                 }
 
                 if (needsMotivo) {
-                    OutlinedTextField(value = motivo, onValueChange = { motivo = it }, label = { Text("Motivo de Cancelación (*)") }, modifier = Modifier.fillMaxWidth(), colors = OutlinedTextFieldDefaults.colors(focusedBorderColor = PrimaryPurple, unfocusedBorderColor = Color.Gray))
+                    OutlinedTextField(
+                        value = motivo,
+                        onValueChange = { motivo = it },
+                        label = { Text("Motivo de Cancelación (*)") },
+                        modifier = Modifier.fillMaxWidth()
+                    )
                 }
             }
         },
         confirmButton = {
-            Button(onClick = { selectedEstado?.let { onConfirm(it, if (needsMotivo) motivo else null) } }, enabled = selectedEstado != null && (!needsMotivo || motivo.isNotBlank()), colors = ButtonDefaults.buttonColors(containerColor = PrimaryPurple)) {
-                Text("Confirmar")
-            }
+            Button(
+                onClick = { selectedEstado?.let { onConfirm(it, if (needsMotivo) motivo else null) } },
+                enabled = selectedEstado != null && (!needsMotivo || motivo.isNotBlank())
+            ) { Text("Confirmar") }
         },
         dismissButton = {
             TextButton(onClick = onDismiss) { Text("Cancelar", color = AccentOrange) }
@@ -284,64 +314,9 @@ private fun ChangeStatusDialog(estados: List<EstadoPedido>, onDismiss: () -> Uni
     )
 }
 
+/* ---------- Utilitarios ---------- */
+
 private fun formatCurrency(value: BigDecimal?): String {
     return NumberFormat.getCurrencyInstance(Locale("es", "SV")).format(value ?: BigDecimal.ZERO)
 }
 
-// Nombre único para evitar duplicados en el proyecto
-private fun pedidoEstadoColor(estado: EstadoPedido?): Color {
-    return when (estado) {
-        EstadoPedido.PENDIENTE -> AccentOrange
-        EstadoPedido.EN_PROCESO -> PrimaryPurple
-        EstadoPedido.ENTREGADO -> Color(0xFF2E7D32)
-        EstadoPedido.CANCELADO -> Color.Red
-        else -> Color.Gray
-    }
-}
-
-// -------------------- PLACEHOLDERS --------------------
-// !! IMPORTANTE !!
-// Estas son clases de ejemplo para que el código compile.
-// Lo más probable es que YA TENGAS estas clases definidas en tu
-// capa de 'data' o 'viewModel'. Si es así, puedes borrar
-// estas definiciones y asegurarte de que tu clase UiState
-// tenga valores por defecto.
-
-/** Enum de ejemplo para el tipo de pago (basado en el uso de .name) */
-enum class TipoPago {
-    TARJETA_CREDITO,
-    EFECTIVO,
-    TRANSFERENCIA
-}
-
-/** Clase de ejemplo para el DTO del Pedido (basada en las propiedades que usas) */
-data class PedidoDto(
-    val idPedido: Int = 0,
-    val estado: EstadoPedido? = null,
-    val fechaInicio: String = "",
-    val total: BigDecimal = BigDecimal.ZERO,
-    val tipoPago: TipoPago? = null // Usamos el Enum de ejemplo
-)
-
-/** Clase de ejemplo para el DTO del Usuario (basada en las propiedades que usas) */
-data class UsuarioDto(
-    val idUser: Int = 0,
-    val primerNombre: String = "",
-    val primerApellido: String = "",
-    val email: String = "",
-    val username: String = ""
-)
-
-/**
- * Esta es la clase de estado que 'collectAsState' necesita como valor inicial.
- * Debe tener valores por defecto para todas sus propiedades para poder
- * crear una instancia vacía: OrderDetailUiState()
- */
-data class OrderDetailUiState(
-    val isLoading: Boolean = true, // Inicia como 'true' para mostrar el loader
-    val error: String? = null,
-    val actionError: String? = null,
-    val pedido: PedidoDto? = null,
-    val usuario: UsuarioDto? = null,
-    val pedidoItems: List<PedidoItemDto> = emptyList()
-)
