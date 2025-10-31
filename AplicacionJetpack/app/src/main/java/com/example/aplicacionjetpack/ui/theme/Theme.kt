@@ -9,35 +9,49 @@ import androidx.compose.material3.dynamicDarkColorScheme
 import androidx.compose.material3.dynamicLightColorScheme
 import androidx.compose.material3.lightColorScheme
 import androidx.compose.runtime.Composable
+// --- 👇👇👇 ¡AÑADIMOS LA IMPORTACIÓN DE COLOR! 👇👇👇 ---
+import androidx.compose.ui.graphics.Color
+// --- ------------------------------------------- ---
 import androidx.compose.ui.platform.LocalContext
 
 private val DarkColorScheme = darkColorScheme(
     primary = Purple80,
     secondary = PurpleGrey80,
-    tertiary = Pink80
+    tertiary = Pink80,
+    // --- Opcional: Para mejorar el modo oscuro ---
+    background = Color(0xFF1C1B1F),
+    surface = Color(0xFF1C1B1F),
+    onPrimary = Color.Black,
+    onSecondary = Color.Black,
+    onTertiary = Color.Black,
+    onBackground = Color(0xFFE6E1E5),
+    onSurface = Color(0xFFE6E1E5)
 )
 
+// --- 👇👇👇 ¡¡¡LA CORRECCIÓN DE LA VICTORIA ESTÁ AQUÍ!!! 👇👇👇 ---
 private val LightColorScheme = lightColorScheme(
-    primary = Purple40,
-    secondary = PurpleGrey40,
-    tertiary = Pink40
+    primary = PurpleDark,       // Tu color primario principal (morado oscuro)
+    secondary = OrangeAccent,   // Tu color secundario (naranja)
+    tertiary = Pink40,          // Mantenemos este por si se usa
 
-    /* Other default colors to override
-    background = Color(0xFFFFFBFE),
-    surface = Color(0xFFFFFBFE),
-    onPrimary = Color.White,
-    onSecondary = Color.White,
-    onTertiary = Color.White,
-    onBackground = Color(0xFF1C1B1F),
-    onSurface = Color(0xFF1C1B1F),
-    */
+    // --- Colores de fondo y superficie ---
+    background = Color(0xFFFDFBFF), // Un blanco ligeramente roto, muy común
+    surface = Color(0xFFFDFBFF),    // Superficies como Cards usarán este blanco
+
+    // --- Colores del TEXTO (on = sobre) ---
+    onPrimary = Color.White,        // Texto sobre un botón primario (morado) será blanco
+    onSecondary = Color.White,      // Texto sobre un botón secundario (naranja) será blanco
+    onTertiary = Color.White,       // Texto sobre un botón terciario será blanco
+    onBackground = Color.Black,     // ¡¡¡EL TEXTO SOBRE EL FONDO SERÁ NEGRO!!!
+    onSurface = Color.Black         // ¡¡¡EL TEXTO SOBRE CARDS SERÁ NEGRO!!!
 )
+// --- ----------------------------------------------------------------- ---
 
 @Composable
 fun AplicacionJetpackTheme(
     darkTheme: Boolean = isSystemInDarkTheme(),
-    // Dynamic color is available on Android 12+
-    dynamicColor: Boolean = true,
+    // Dynamic color es mejor deshabilitarlo para tener un branding consistente
+    dynamicColor: Boolean = false, // <-- CAMBIADO A 'false'
     content: @Composable () -> Unit
 ) {
     val colorScheme = when {
