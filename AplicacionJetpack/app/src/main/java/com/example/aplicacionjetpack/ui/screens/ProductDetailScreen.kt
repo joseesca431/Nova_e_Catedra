@@ -106,11 +106,7 @@ fun ProductDetailScreen(
             )
         },
         snackbarHost = { SnackbarHost(hostState = snackbarHostState) },
-        floatingActionButton = {
-            FloatingActionButton(onClick = { viewModel.refresh(productId) }, containerColor = brandAccent) {
-                Icon(Icons.Default.Refresh, contentDescription = "Refrescar", tint = surfaceWhite)
-            }
-        },
+
         containerColor = backgroundSoft
     ) { innerPadding ->
 
@@ -375,7 +371,7 @@ fun ProductDetailScreen(
                                 focusedTextColor = brandPrimary,
                                 unfocusedTextColor = brandPrimary.copy(alpha = 0.9f),
                                 cursorColor = brandAccent,
-                       
+
                             ),
                             shape = RoundedCornerShape(10.dp)
                         )
