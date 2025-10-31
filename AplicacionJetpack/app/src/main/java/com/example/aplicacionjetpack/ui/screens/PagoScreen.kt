@@ -20,7 +20,6 @@ import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.text.input.VisualTransformation
-import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.hilt.navigation.compose.hiltViewModel
@@ -35,6 +34,7 @@ import com.example.aplicacionjetpack.ui.viewmodel.CarritoViewModel
 import com.example.aplicacionjetpack.ui.viewmodel.CheckoutViewModel
 import com.example.aplicacionjetpack.utils.CardNumberVisualTransformation
 import com.example.aplicacionjetpack.utils.ExpiryDateVisualTransformation
+import java.math.BigDecimal
 import java.text.NumberFormat
 import java.time.Year
 import java.util.Locale
@@ -75,6 +75,39 @@ fun PagoScreen(
         }
     }
 
+    // Pequeña función local para convertir tipos variados a BigDecimal
+    fun toBigDecimal(value: Any?): BigDecimal {
+        return when (value) {
+            null -> BigDecimal.ZERO
+            is BigDecimal -> value
+            is Number -> BigDecimal.valueOf(value.toDouble())
+            is String -> try { BigDecimal(value.trim()) } catch (_: Exception) { BigDecimal.ZERO }
+            else -> BigDecimal.ZERO
+        }
+    }
+
+    val currency = NumberFormat.getCurrencyInstance(Locale.US)
+
+    // Convierte de forma segura a BigDecimal (soporta BigDecimal, Number, String, null)
+    val subtotalBd = toBigDecimal(carritoUiState.total) // carritoUiState.total puede ser Number/Double/Long
+    val shippingBd = toBigDecimal(uiState.shippingCost) // uiState.shippingCost puede ser String/Number/BigDecimal
+    val couponBd = toBigDecimal(uiState.couponDiscount) // valor del parámetro (si existe)
+
+    // Si hay un cupón aplicado por el usuario, NO lo mezclamos con couponBd (parámetro), el backend decidirá cómo aplicar.
+    // Aquí couponBd es sólo *parámetro* (por ejemplo descuento general) — si quieres mostrar el descuento del cupón aplicado antes de validar,
+    // necesitas un endpoint de validación de cupón (no incluido aquí).
+    val rawTotalBd = subtotalBd.add(shippingBd).subtract(couponBd)
+    val finalTotalBd = if (rawTotalBd.signum() < 0) BigDecimal.ZERO else rawTotalBd
+
+    // Convertimos a Double explícitamente para NumberFormat
+    val subtotal = subtotalBd.toDouble()
+    val shipping = shippingBd.toDouble()
+    val coupon = couponBd.toDouble()
+    val finalTotal = finalTotalBd.toDouble()
+
+    // Estado UI para mostrar/ocultar input cupón
+    var showCouponInput by remember { mutableStateOf(false) }
+
     Scaffold(
         topBar = {
             TopAppBar(
@@ -97,7 +130,7 @@ fun PagoScreen(
                 .padding(24.dp)
         ) {
 
-            // Selector de método de pago (etiqueta 'Selecciona un método' más visible)
+            // Selector de método de pago
             Text(
                 "MÉTODO DE PAGO",
                 style = MaterialTheme.typography.titleMedium,
@@ -145,15 +178,8 @@ fun PagoScreen(
                 ) {
                     TipoPago.values().forEach { selectionOption ->
                         DropdownMenuItem(
-                            text = {
-                                Text(
-                                    selectionOption.displayName,
-                                    color = PurpleDark
-                                )
-                            },
-                            onClick = {
-                                viewModel.onMetodoPagoChange(selectionOption)
-                            },
+                            text = { Text(selectionOption.displayName, color = PurpleDark) },
+                            onClick = { viewModel.onMetodoPagoChange(selectionOption) },
                             contentPadding = ExposedDropdownMenuDefaults.ItemContentPadding
                         )
                     }
@@ -162,40 +188,130 @@ fun PagoScreen(
 
             Spacer(modifier = Modifier.height(20.dp))
 
-            // Campos de formulario dinámicos según método seleccionado
+            // Campos de formulario según método
             when (uiState.metodoPagoSeleccionado) {
                 TipoPago.TARJETA_CREDITO -> TarjetaForm(viewModel = viewModel, uiState = uiState)
                 TipoPago.PAYPAL -> PaypalForm(viewModel = viewModel, uiState = uiState)
                 TipoPago.EFECTIVO -> EfectivoInfo()
             }
 
-            // Muestra de error general del UI state
+            // Mensaje error general
             uiState.error?.let { err ->
                 Spacer(modifier = Modifier.height(12.dp))
-                Text(
-                    text = err,
-                    color = MaterialTheme.colorScheme.error,
-                    modifier = Modifier.fillMaxWidth()
-                )
+                Text(text = err, color = MaterialTheme.colorScheme.error, modifier = Modifier.fillMaxWidth())
             }
 
             Spacer(modifier = Modifier.weight(1f))
 
             Divider(color = Color(0xFFEDEDED), thickness = 1.dp, modifier = Modifier.padding(vertical = 12.dp))
 
-            // Total
+            // Resumen de costos
             Column(
-                modifier = Modifier.fillMaxWidth(),
-                horizontalAlignment = Alignment.CenterHorizontally
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .background(SurfaceWhite, RoundedCornerShape(8.dp))
+                    .padding(16.dp)
             ) {
-                Text("TOTAL A PAGAR:", fontSize = 14.sp, color = Color.Gray, fontWeight = FontWeight.Medium, modifier = Modifier.padding(bottom = 4.dp))
-                val totalFormatted = NumberFormat.getCurrencyInstance(Locale.US).format(carritoUiState.total)
-                Text(totalFormatted, fontSize = 24.sp, color = PurpleDark, fontWeight = FontWeight.Bold)
+                Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween, verticalAlignment = Alignment.CenterVertically) {
+                    Text("Subtotal", fontSize = 14.sp, color = Color.Gray)
+                    Text(currency.format(subtotal), fontSize = 14.sp, color = BrandBlack, fontWeight = FontWeight.Medium)
+                }
+
+                Spacer(modifier = Modifier.height(8.dp))
+
+                Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween, verticalAlignment = Alignment.CenterVertically) {
+                    Text("Costo de envío", fontSize = 14.sp, color = Color.Gray)
+                    Text(
+                        if (shippingBd.compareTo(BigDecimal.ZERO) <= 0) "Gratis" else currency.format(shipping),
+                        fontSize = 14.sp,
+                        color = BrandBlack,
+                        fontWeight = FontWeight.Medium
+                    )
+                }
+
+                Spacer(modifier = Modifier.height(8.dp))
+
+                // Mostrar parámetro de cupón (si existe)
+                if (couponBd.compareTo(BigDecimal.ZERO) > 0) {
+                    Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween, verticalAlignment = Alignment.CenterVertically) {
+                        Text("Descuento (parámetro)", fontSize = 14.sp, color = Color.Gray)
+                        Text("-${currency.format(coupon)}", fontSize = 14.sp, color = BrandBlack, fontWeight = FontWeight.Medium)
+                    }
+                    Spacer(modifier = Modifier.height(8.dp))
+                }
+
+                // Sección cupón del usuario (expandible)
+                Spacer(modifier = Modifier.height(8.dp))
+                Row(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .clickable { showCouponInput = !showCouponInput }
+                        .padding(vertical = 8.dp),
+                    horizontalArrangement = Arrangement.SpaceBetween,
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    Text("¿Tienes un cupón?", fontSize = 14.sp, color = PurpleDark, fontWeight = FontWeight.Medium)
+                    Text(if (showCouponInput) "Ocultar" else "Aplicar", fontSize = 14.sp, color = OrangeAccent)
+                }
+
+                if (showCouponInput) {
+                    Spacer(modifier = Modifier.height(8.dp))
+                    Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp), verticalAlignment = Alignment.CenterVertically) {
+                        OutlinedTextField(
+                            value = uiState.couponCode ?: "",
+                            onValueChange = { viewModel.onCouponCodeChange(it) },
+                            modifier = Modifier.weight(1f),
+                            placeholder = { Text("Código de cupón") },
+                            singleLine = true,
+                            shape = RoundedCornerShape(8.dp),
+                            colors = TextFieldDefaults.outlinedTextFieldColors(
+                                focusedBorderColor = Purple40,
+                                unfocusedBorderColor = Color.LightGray,
+                                cursorColor = PurpleDark
+                            )
+                        )
+
+                        if (uiState.appliedCouponCode == null) {
+                            Button(
+                                onClick = { viewModel.applyCouponLocally() },
+                                modifier = Modifier.height(48.dp),
+                                shape = RoundedCornerShape(8.dp),
+                                colors = ButtonDefaults.buttonColors(containerColor = OrangeAccent)
+                            ) {
+                                Text("Aplicar", color = Color.White, fontWeight = FontWeight.Bold)
+                            }
+                        } else {
+                            OutlinedButton(
+                                onClick = { viewModel.removeAppliedCoupon() },
+                                modifier = Modifier.height(48.dp),
+                                shape = RoundedCornerShape(8.dp)
+                            ) {
+                                Text("Quitar", color = PurpleDark)
+                            }
+                        }
+                    }
+
+                    Spacer(modifier = Modifier.height(8.dp))
+                    uiState.appliedCouponCode?.let { applied ->
+                        Text("Cupón aplicado: $applied", color = PurpleDark, fontWeight = FontWeight.Medium)
+                    } ?: run {
+                        uiState.couponApplyError?.let { e ->
+                            Text(e, color = MaterialTheme.colorScheme.error)
+                        }
+                    }
+                }
+
+                Divider(color = Color(0xFFEDEDED), thickness = 1.dp, modifier = Modifier.padding(vertical = 8.dp))
+
+                Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween, verticalAlignment = Alignment.CenterVertically) {
+                    Text("Total a pagar", fontSize = 16.sp, color = PurpleDark, fontWeight = FontWeight.Bold)
+                    Text(currency.format(finalTotal), fontSize = 20.sp, color = PurpleDark, fontWeight = FontWeight.Bold)
+                }
             }
 
             Spacer(modifier = Modifier.height(16.dp))
 
-            // Botón PAGAR: Al presionar, realizamos validación según método
+            // Botón PAGAR: valida y procesa
             Button(
                 onClick = {
                     // Validación por método
@@ -289,7 +405,7 @@ fun PagoScreen(
     }
 }
 
-/* ---------- Composables auxiliares ---------- */
+/* ---------- Composables auxiliares (idénticos a los tuyos) ---------- */
 
 @Composable
 private fun TarjetaForm(viewModel: CheckoutViewModel, uiState: com.example.aplicacionjetpack.ui.viewmodel.CheckoutUiState) {
@@ -416,16 +532,14 @@ private fun PaymentTextField(
     }
 }
 
-/* ---------- Validadores locales simples (evitan dependencias externas) ---------- */
+/* ---------- Validadores locales simples ---------- */
 
 private fun isValidCardNumberLocal(number: String): Boolean {
-    // elimina espacios y comprueba longitud mínima (13-19) y solo dígitos
     val digits = number.filter { it.isDigit() }
     return digits.length in 13..19
 }
 
 private fun isValidExpiryLocal(mmYY: String): Boolean {
-    // formato esperado "MM/YY" o "MMYY"
     val cleaned = mmYY.filter { it.isDigit() }
     if (cleaned.length != 4) return false
     val month = cleaned.substring(0, 2).toIntOrNull() ?: return false

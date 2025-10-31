@@ -1,3 +1,5 @@
+@file:OptIn(androidx.compose.material3.ExperimentalMaterial3Api::class)
+
 package com.example.aplicacionjetpack.ui.viewmodel
 
 import android.util.Log
@@ -11,6 +13,7 @@ import com.example.aplicacionjetpack.data.AuthManager
 import com.example.aplicacionjetpack.data.dto.*
 import com.example.aplicacionjetpack.data.repository.DireccionRepository
 import com.example.aplicacionjetpack.data.repository.PedidoRepository
+import com.example.aplicacionjetpack.data.repository.ParametroRepository
 import com.example.aplicacionjetpack.utils.ValidationUtils
 import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.Dispatchers
@@ -23,7 +26,7 @@ import java.net.HttpURLConnection
 import java.net.URL
 import javax.inject.Inject
 
-// --- Data Class del Estado (sin cambios) ---
+// ------------------ CheckoutUiState ------------------
 data class CheckoutUiState(
     val direccionesGuardadas: List<DireccionResponse> = emptyList(),
     val isLoadingDirecciones: Boolean = true,
@@ -44,23 +47,94 @@ data class CheckoutUiState(
     val emailPaypal: String = "",
     val isLoading: Boolean = false,
     val error: String? = null,
-    val checkoutSuccess: Boolean = false
+    val checkoutSuccess: Boolean = false,
+    // NUEVOS CAMPOS (vienen del backend / parámetros)
+    val shippingCost: String? = null,
+    val couponDiscount: String? = null,
+    // Campos para cupón gestionados en UI
+    val couponCode: String? = null,        // lo que escribe el usuario
+    val appliedCouponCode: String? = null, // lo aplicado (se envía al backend)
+    val couponApplyError: String? = null   // error al intentar aplicar localmente
 )
 
+// ------------------ ViewModel ------------------
 @HiltViewModel
 class CheckoutViewModel @Inject constructor(
     private val pedidoRepository: PedidoRepository,
-    private val direccionRepository: DireccionRepository
+    private val direccionRepository: DireccionRepository,
+    private val parametroRepository: ParametroRepository
 ) : ViewModel() {
+
+    private val TAG = "CheckoutViewModel"
 
     var uiState by mutableStateOf(CheckoutUiState())
         private set
 
-    private val TAG = "CheckoutVM"
-
     init {
         loadDireccionesGuardadas()
+        loadParametros()
     }
+
+    /**
+     * Carga parámetros desde el backend (costo de envío y descuento de cupón).
+     * Se almacenan como String en uiState.
+     */
+    private fun loadParametros() {
+        viewModelScope.launch {
+            try {
+                // costo de envío (clave esperada en backend: "costo_envio")
+                val envioResult = parametroRepository.getByClave("costo_envio")
+                envioResult.onSuccess { param ->
+                    uiState = uiState.copy(shippingCost = param.valor)
+                    Log.d(TAG, "Parámetro costo_envio: ${param.valor}")
+                }.onFailure { e ->
+                    Log.w(TAG, "No se pudo obtener costo_envio: ${e.message}")
+                }
+
+                // intento de leer descuento general (puede variar el nombre de la clave)
+                val cuponResult = parametroRepository.getByClave("app.coupon.discount")
+                cuponResult.onSuccess { param ->
+                    uiState = uiState.copy(couponDiscount = param.valor)
+                    Log.d(TAG, "Parámetro app.coupon.discount: ${param.valor}")
+                }.onFailure {
+                    // si no existe intenta otra clave "descuento_cupon"
+                    val alt = parametroRepository.getByClave("descuento_cupon")
+                    alt.onSuccess { p -> uiState = uiState.copy(couponDiscount = p.valor); Log.d(TAG,"Parámetro descuento_cupon: ${p.valor}") }
+                    alt.onFailure { e -> Log.w(TAG, "No se pudo obtener coupon discount: ${e.message}") }
+                }
+            } catch (e: Exception) {
+                Log.e(TAG, "Error en loadParametros()", e)
+                uiState = uiState.copy(shippingCost = null, couponDiscount = null)
+            }
+        }
+    }
+
+    // ------------------ Cupón (UI) ------------------
+
+    fun onCouponCodeChange(code: String) {
+        uiState = uiState.copy(couponCode = code, couponApplyError = null)
+    }
+
+    /**
+     * Aplica localmente el cupón (optimista).
+     * Si quieres validarlo previamente llama a un endpoint de validación aquí.
+     */
+    fun applyCouponLocally() {
+        val code = uiState.couponCode?.trim()
+        if (code.isNullOrBlank()) {
+            uiState = uiState.copy(couponApplyError = "Ingresa un código de cupón válido")
+            return
+        }
+
+        // Marcar como aplicado localmente (optimista). Backend deberá validar en checkout.
+        uiState = uiState.copy(appliedCouponCode = code, couponApplyError = null)
+    }
+
+    fun removeAppliedCoupon() {
+        uiState = uiState.copy(appliedCouponCode = null)
+    }
+
+    // ------------------ Direcciones ------------------
 
     fun loadDireccionesGuardadas() {
         val userId = AuthManager.userId ?: return
@@ -122,22 +196,13 @@ class CheckoutViewModel @Inject constructor(
                     latitud = lat,
                     longitud = lon,
                     isLoadingAddressFromMap = false,
-                    aliasDireccion = "" // Dejamos el alias vacío para que el usuario lo llene
+                    aliasDireccion = ""
                 )
             } catch (e: Exception) {
                 uiState = uiState.copy(isLoadingAddressFromMap = false, error = "No se pudo obtener la dirección.")
                 Log.e(TAG, "Error al obtener dirección desde coordenadas", e)
             }
         }
-    }
-
-    // --- FUNCIÓN PARA EL ALIAS (SE MANTIENE) ---
-    fun onAliasChange(nuevoAlias: String) {
-        uiState = uiState.copy(aliasDireccion = nuevoAlias)
-    }
-
-    fun setUsarDireccionExistenteId(id: Long?) {
-        uiState = uiState.copy(usarDireccionExistenteId = id)
     }
 
     private suspend fun getAddressFromCoordinates(lat: Double, lon: Double): AddressInfo {
@@ -164,19 +229,55 @@ class CheckoutViewModel @Inject constructor(
 
     private data class AddressInfo(val calle: String, val ciudad: String, val depto: String)
 
-    // --- 👇👇👇 ¡¡¡LA VALIDACIÓN SIMPLE Y FUNCIONAL HA VUELTO!!! 👇👇👇 ---
+    // ------------------ Alias / UI interactions ------------------
+
+    fun onAliasChange(nuevoAlias: String) {
+        uiState = uiState.copy(aliasDireccion = nuevoAlias)
+    }
+
+    fun setUsarDireccionExistenteId(id: Long?) {
+        uiState = uiState.copy(usarDireccionExistenteId = id)
+    }
+
+    // ------------------ Validaciones ------------------
+
     val isAddressValid: Boolean
         get() = uiState.departamento.isNotBlank() && uiState.municipio.isNotBlank() && uiState.direccion.isNotBlank()
-    // --- ---------------------------------------------------------------- ---
 
-    fun onMetodoPagoChange(nuevoMetodo: TipoPago) { uiState = uiState.copy(metodoPagoSeleccionado = nuevoMetodo, isDropdownExpanded = false, error = null) }
-    fun onDropdownDismiss() { uiState = uiState.copy(isDropdownExpanded = false) }
-    fun onDropdownClicked() { uiState = uiState.copy(isDropdownExpanded = true) }
-    fun onNumeroTarjetaChange(value: String) { val digitsOnly = value.filter { it.isDigit() }; uiState = uiState.copy(numeroTarjeta = digitsOnly.take(16)) }
-    fun onFechaVencimientoChange(value: String) { val digitsOnly = value.filter { it.isDigit() }; uiState = uiState.copy(fechaVencimiento = digitsOnly.take(4)) }
-    fun onCvvChange(value: String) { val digitsOnly = value.filter { it.isDigit() }; uiState = uiState.copy(cvv = digitsOnly.take(4)) }
-    fun onTitularChange(value: String) { uiState = uiState.copy(titular = value) }
-    fun onEmailPaypalChange(value: String) { uiState = uiState.copy(emailPaypal = value) }
+    fun onMetodoPagoChange(nuevoMetodo: TipoPago) {
+        uiState = uiState.copy(metodoPagoSeleccionado = nuevoMetodo, isDropdownExpanded = false, error = null)
+    }
+
+    fun onDropdownDismiss() {
+        uiState = uiState.copy(isDropdownExpanded = false)
+    }
+
+    fun onDropdownClicked() {
+        uiState = uiState.copy(isDropdownExpanded = true)
+    }
+
+    fun onNumeroTarjetaChange(value: String) {
+        val digitsOnly = value.filter { it.isDigit() }
+        uiState = uiState.copy(numeroTarjeta = digitsOnly.take(16))
+    }
+
+    fun onFechaVencimientoChange(value: String) {
+        val digitsOnly = value.filter { it.isDigit() }
+        uiState = uiState.copy(fechaVencimiento = digitsOnly.take(4))
+    }
+
+    fun onCvvChange(value: String) {
+        val digitsOnly = value.filter { it.isDigit() }
+        uiState = uiState.copy(cvv = digitsOnly.take(4))
+    }
+
+    fun onTitularChange(value: String) {
+        uiState = uiState.copy(titular = value)
+    }
+
+    fun onEmailPaypalChange(value: String) {
+        uiState = uiState.copy(emailPaypal = value)
+    }
 
     val isPaymentValid: Boolean by derivedStateOf {
         when (uiState.metodoPagoSeleccionado) {
@@ -191,14 +292,15 @@ class CheckoutViewModel @Inject constructor(
         }
     }
 
+    // ------------------ Checkout / Pago ------------------
+
     fun processFinalCheckout(idCarrito: Long) {
-        // --- 👇👇👇 ¡¡¡LA VALIDACIÓN DEL ALIAS AHORA VIVE AQUÍ, DONDE DEBE!!! 👇👇👇 ---
+        // Validación del alias y dirección
         val isNewAddress = uiState.usarDireccionExistenteId == null
         if (!isAddressValid || (isNewAddress && uiState.aliasDireccion.isBlank())) {
             uiState = uiState.copy(error = "La dirección (y el alias si es nueva) no es válida.")
             return
         }
-        // --- ----------------------------------------------------------------------- ---
 
         if (!isPaymentValid) {
             uiState = uiState.copy(error = "Los datos del método de pago son inválidos.")
@@ -215,14 +317,17 @@ class CheckoutViewModel @Inject constructor(
                 handleError("No se pudo procesar la dirección: ${it.message}")
                 return@launch
             }
+
             val pedidoRequest = PedidoRequest(
                 idCarrito = idCarrito,
                 tipoPago = uiState.metodoPagoSeleccionado.name,
-                cuponCodigo = null,
+                cuponCodigo = uiState.appliedCouponCode, // <-- ahora mandamos el cupón si existe
                 idDireccion = idDireccionFinal
             )
+
             val checkoutResult = pedidoRepository.checkout(pedidoRequest)
             checkoutResult.onSuccess { pedidoCreado ->
+                // Armar pagoRequest incluyendo detalles de pago (añadimos shippingCost y couponDiscount en detalles)
                 val pagoRequest = PagoRequest(
                     detallesPago = buildPaymentDetailsJson(),
                     usuario = UserRequest(idUser = userId)
@@ -239,6 +344,9 @@ class CheckoutViewModel @Inject constructor(
         }
     }
 
+    /**
+     * Build JSON con los detalles de pago + shipping & coupon (si existen).
+     */
     private fun buildPaymentDetailsJson(): String {
         val json = JSONObject()
         when (uiState.metodoPagoSeleccionado) {
@@ -248,9 +356,21 @@ class CheckoutViewModel @Inject constructor(
                 json.put("cvv", uiState.cvv)
                 json.put("titular", uiState.titular)
             }
-            TipoPago.PAYPAL -> { json.put("email", uiState.emailPaypal) }
-            TipoPago.EFECTIVO -> { json.put("mensaje", "Pago se realizará contra entrega.") }
+            TipoPago.PAYPAL -> {
+                json.put("email", uiState.emailPaypal)
+            }
+            TipoPago.EFECTIVO -> {
+                json.put("mensaje", "Pago se realizará contra entrega.")
+            }
         }
+
+        // Agregar shipping/coupon tal como vienen del parámetro (puede ser null)
+        uiState.shippingCost?.let { json.put("shippingCost", it) }
+        uiState.couponDiscount?.let { json.put("couponDiscount", it) }
+
+        // Agregamos también el cupón aplicado por el usuario (si lo hay)
+        uiState.appliedCouponCode?.let { json.put("appliedCouponCode", it) }
+
         return json.toString()
     }
 

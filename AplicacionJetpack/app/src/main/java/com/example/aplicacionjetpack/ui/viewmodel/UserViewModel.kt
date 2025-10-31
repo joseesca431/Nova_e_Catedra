@@ -47,6 +47,9 @@ class UserViewModel @Inject constructor(
     fun onUsernameChanged(value: String) { uiState = uiState.copy(username = value, error = null) }
     fun onEmailChanged(value: String) { uiState = uiState.copy(email = value, error = null) }
 
+    fun clearError() {
+        uiState = uiState.copy(error = null)
+    }
     fun onTelefonoChanged(value: String) {
         val digits = value.filter { it.isDigit() }
         val formatted = when {

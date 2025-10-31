@@ -182,16 +182,33 @@ fun EditarProfileScreen(
 
                 Spacer(modifier = Modifier.height(8.dp))
 
-                // --- MENSAJE DE ERROR (desde ViewModel) ---
+                // --- 👇👇👇 INICIO DEL CAMBIO: DIÁLOGO DE ERROR DE BACKEND 👇👇👇 ---
+                // Reemplazamos el Text(uiState.error) por este diálogo
                 if (uiState.error != null) {
-                    Text(
-                        text = uiState.error,
-                        color = MaterialTheme.colorScheme.error,
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .padding(horizontal = 8.dp)
+                    // Usamos 'remember' para calcular el mensaje solo cuando el error cambie
+                    val friendlyMessage = remember(uiState.error) {
+                        getFriendlyErrorMessage(uiState.error)
+                    }
+
+                    AlertDialog(
+                        onDismissRequest = { viewModel.clearError() }, // Limpia el error si se toca fuera
+                        confirmButton = {
+                            TextButton(onClick = { viewModel.clearError() }) { // Limpia el error al presionar OK
+                                Text("Entendido", color = OrangeAccent, fontWeight = FontWeight.Bold)
+                            }
+                        },
+                        title = { Text("Ocurrió un Error", color = BrandBlack, fontWeight = FontWeight.SemiBold) },
+                        text = {
+                            Text(
+                                friendlyMessage,
+                                color = BrandBlack.copy(alpha = 0.9f),
+                                fontSize = 14.sp
+                            )
+                        },
+                        containerColor = Color.White
                     )
                 }
+                // --- 👆👆👆 FIN DEL CAMBIO 👆👆👆 ---
 
                 // --- BOTÓN DE GUARDAR: valida campos antes de llamar a viewModel.updateProfile() ---
                 Button(
@@ -209,7 +226,6 @@ fun EditarProfileScreen(
                                 showValidationDialog = true
                                 return@Button
                             }
-                            // optional: could add password strength validation here
                         }
                         // Contraseña actual es obligatoria para guardar cambios
                         if (uiState.currentPassword.isBlank()) missing.add("Contraseña actual")
@@ -242,7 +258,8 @@ fun EditarProfileScreen(
         }
     }
 
-    // --- DIALOGO DE VALIDACIÓN AMABLE ---
+    // --- DIALOGO DE VALIDACIÓN AMABLE (Client-Side) ---
+    // (Este se mantiene igual para los errores de campos vacíos)
     if (showValidationDialog) {
         AlertDialog(
             onDismissRequest = { showValidationDialog = false },
@@ -303,4 +320,33 @@ private fun ProfileTextField(
         ),
         shape = RoundedCornerShape(8.dp)
     )
+}
+
+/**
+ * Función helper para "traducir" errores técnicos del backend
+ * a mensajes amigables para el usuario.
+ */
+private fun getFriendlyErrorMessage(error: String?): String {
+    if (error == null) return "Ocurrió un error desconocido."
+
+    // HTTP 400: Bad Request. (Contraseña actual mal, etc.)
+    // HTTP 401/403: Unauthorized / Forbidden
+    if (error.contains("400") || error.contains("401") || error.contains("403")) {
+        return "Los datos no son correctos. Es muy probable que tu 'Contraseña Actual' sea incorrecta. Por favor, verifícala."
+    }
+    // HTTP 409: Conflict. (Email ya en uso)
+    if (error.contains("409")) {
+        return "El correo electrónico que intentas registrar ya está en uso por otra cuenta."
+    }
+    // HTTP 500: Server error.
+    if (error.contains("500") || error.contains("503")) {
+        return "Hubo un problema en nuestros servidores. Por favor, inténtalo de nuevo más tarde."
+    }
+    // Errores de red
+    if (error.lowercase().contains("network") || error.lowercase().contains("socket") || error.lowercase().contains("conexión")) {
+        return "No se pudo conectar. Revisa tu conexión a internet e inténtalo de nuevo."
+    }
+
+    // Mensaje genérico para cualquier otro error
+    return "Ocurrió un error inesperado ($error). Por favor, inténtalo de nuevo."
 }

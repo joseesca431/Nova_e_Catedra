@@ -2,6 +2,8 @@ package com.example.aplicacionjetpack.di
 
 import com.example.aplicacionjetpack.data.api.*
 import com.example.aplicacionjetpack.data.remote.interceptor.AuthInterceptor
+import com.example.aplicacionjetpack.data.repository.ParametroRepository
+import com.example.aplicacionjetpack.data.repository.ParametroRepositoryImpl
 import dagger.Module
 import dagger.Provides
 import dagger.hilt.InstallIn
@@ -54,5 +56,15 @@ object NetworkModule {
     @Provides @Singleton fun provideNotificacionApi(retrofit: Retrofit): NotificacionApi = retrofit.create(NotificacionApi::class.java)
     @Provides @Singleton fun provideHistorialPedidoApi(retrofit: Retrofit): HistorialPedidoApi = retrofit.create(HistorialPedidoApi::class.java)
 
-    // --- 👇👇👇 ¡¡¡EL @Binds ILEGAL Y DUPLICADO HA SIDO ELIMINADO DE AQUÍ!!! 👇👇👇 ---
+    // --- Nuevo: proveedor para ParametroService / ParametroApi ---
+    @Provides
+    @Singleton
+    fun provideParametroService(retrofit: Retrofit): ParametroService =
+        retrofit.create(ParametroService::class.java)
+
+    @Provides
+    @Singleton
+    fun provideParametroRepository(service: ParametroService): ParametroRepository =
+        ParametroRepositoryImpl(service)
+
 }
