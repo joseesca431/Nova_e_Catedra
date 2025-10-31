@@ -2,6 +2,7 @@ package com.example.adminappnova.data.api
 
 import com.example.adminappnova.data.dto.PagedResponse
 import com.example.adminappnova.data.dto.PagoRequest // <-- Necesitarás este DTO si usas /pagar
+import com.example.adminappnova.data.dto.PedidoItemDto
 import com.example.adminappnova.data.dto.PedidoResponse
 import retrofit2.http.*
 import java.math.BigDecimal
@@ -40,6 +41,10 @@ interface PedidoApiService {
 
     @POST("auth/pedido/{id}/cancelar")
     suspend fun cancelar(@Path("id") id: Long, @Query("motivo") motivo: String): PedidoResponse
+
+    // --- 👇👇👇 ¡EL ENDPOINT DE LA VICTORIA! 👇👇👇 ---
+    @GET("auth/pedido/{id}/items")
+    suspend fun getPedidoItems(@Path("id") id: Long): List<PedidoItemDto>
 
     // --- Otros Endpoints (si los necesitas en la app admin) ---
     // @POST("auth/pedido/checkout")

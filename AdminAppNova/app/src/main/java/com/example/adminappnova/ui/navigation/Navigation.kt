@@ -21,10 +21,10 @@ import com.example.adminappnova.ui.screens.SplashScreen
 import com.example.adminappnova.ui.viewmodel.CategoriesViewModel
 import com.example.adminappnova.ui.viewmodel.HomeViewModel
 import com.example.adminappnova.ui.viewmodel.LoginViewModel
+import com.example.adminappnova.ui.viewmodel.OrderDetailViewModel
 import com.example.adminappnova.ui.viewmodel.PedidosViewModel
-import com.example.adminappnova.ui.viewmodel.ProductListViewModel // Renombrado para CategoriesDetailScreen
-import com.example.adminappnova.ui.viewmodel.ProductDetailViewModel // Renombrado para ProductCategoriesScreen
-import com.example.adminappnova.ui.viewmodel.OrderDetailViewModel // Renombrado para DetallesPagoScreen
+import com.example.adminappnova.ui.viewmodel.ProductDetailViewModel
+import com.example.adminappnova.ui.viewmodel.ProductListViewModel
 
 @Composable
 fun AppNavigation(){
@@ -70,7 +70,6 @@ fun AppNavigation(){
                 uiState = uiState,
                 onAddCategoryClick = viewModel::onAddCategoryClicked,
                 onDismissAddDialog = viewModel::onDismissAddDialog,
-                // Corregido: Pasa el evento que actualiza el 'tipo' (que en la UI se llama 'Name')
                 onNewCategoryNameChange = viewModel::onNewCategoryTypeChange,
                 onConfirmAddCategory = viewModel::onConfirmAddCategory
             )
@@ -82,10 +81,10 @@ fun AppNavigation(){
             val uiState = viewModel.uiState
             PedidosScreen(
                 navController = navController,
-                uiState = uiState, // 👈 Pasa el estado
-                onLoadNextPage = viewModel::loadNextPage, // 👈 Pasa evento
-                onRefresh = viewModel::refreshPedidos, // 👈 Pasa evento
-                onChangeFilter = viewModel::changeFilter // 👈 Pasa evento
+                uiState = uiState,
+                onLoadNextPage = viewModel::loadNextPage,
+                onRefresh = viewModel::refreshPedidos,
+                onChangeFilter = viewModel::changeFilter
             )
         }
 
@@ -94,21 +93,18 @@ fun AppNavigation(){
             route = "categories_detail/{categoryName}",
             arguments = listOf(navArgument("categoryName") { type = NavType.StringType })
         ) { backStackEntry ->
-            val viewModel: ProductListViewModel = hiltViewModel() // Usa el VM de Lista de Productos
+            val viewModel: ProductListViewModel = hiltViewModel()
             val uiState = viewModel.uiState
             val categoryName = backStackEntry.arguments?.getString("categoryName") ?: "Categoría"
 
             CategoriesDetailScreen(
                 navController = navController,
                 categoryName = categoryName,
-                uiState = uiState, // 👈 Pasa el estado
-                // Pasa los eventos
+                uiState = uiState,
                 onProductClick = { product ->
-                    // Navega a detalle, pasa categoryName y productId
                     navController.navigate("product_categories/$categoryName?productId=${product.idProducto}")
                 },
                 onAddProductClick = {
-                    // Navega a detalle, pasa categoryName pero NO productId (para crear)
                     navController.navigate("product_categories/$categoryName")
                 },
                 onRefresh = viewModel::refreshProducts
@@ -117,56 +113,58 @@ fun AppNavigation(){
 
         // --- Pantalla Detalle/Crear Producto (Corregida) ---
         composable(
-            route = "product_categories/{categoryName}?productId={productId}", // Ruta con argumento opcional
+            route = "product_categories/{categoryName}?productId={productId}",
             arguments = listOf(
                 navArgument("categoryName") { type = NavType.StringType },
-                navArgument("productId") { type = NavType.StringType; nullable = true } // productId es opcional
+                navArgument("productId") { type = NavType.StringType; nullable = true }
             )
         ) { backStackEntry ->
-            val viewModel: ProductDetailViewModel = hiltViewModel() // Usa el VM de Detalle de Producto
+            val viewModel: ProductDetailViewModel = hiltViewModel()
             val uiState = viewModel.uiState
             val categoryName = backStackEntry.arguments?.getString("categoryName") ?: "Categoría"
 
-            // Efecto para navegar atrás automáticamente al guardar o eliminar
             LaunchedEffect(uiState.saveSuccess, uiState.deleteSuccess) {
                 if (uiState.saveSuccess || uiState.deleteSuccess) {
-                    navController.popBackStack() // Vuelve a la pantalla anterior
+                    navController.popBackStack()
                 }
             }
 
             ProductCategoriesScreen(
                 navController = navController,
                 categoryName = categoryName,
-                uiState = uiState, // 👈 Pasa el estado
-                // 👈 Pasa TODOS los eventos
+                uiState = uiState,
                 onNombreChange = viewModel::onNombreChange,
                 onDescripcionChange = viewModel::onDescripcionChange,
                 onCantidadChange = viewModel::onCantidadChange,
                 onPrecioChange = viewModel::onPrecioChange,
                 onCostoChange = viewModel::onCostoChange,
                 onCantidadPuntosChange = viewModel::onCantidadPuntosChange,
-                // onAddImageClick = viewModel::onAddImageClicked, // Descomentar si implementas imagen
                 onDeleteClick = viewModel::onDeleteClicked,
                 onSaveClick = viewModel::onSaveClicked
             )
         }
 
-        // --- Pantalla Detalles de Pedido (Corregida) ---
+        // --- 👇👇👇 ¡¡¡LA SECCIÓN CORREGIDA DE LA VICTORIA!!! 👇👇👇 ---
         composable(
-            route = "detalles_pago/{pedidoId}", // <-- RUTA CORREGIDA con argumento
-            arguments = listOf(navArgument("pedidoId") { type = NavType.LongType }) // <-- DEFINE EL ARGUMENTO
+            // La ruta ahora acepta DOS argumentos, como lo definimos antes
+            route = "detalles_pago/{pedidoId}/{userId}",
+            arguments = listOf(
+                navArgument("pedidoId") { type = NavType.LongType },
+                navArgument("userId") { type = NavType.LongType } // ¡Definimos el nuevo argumento!
+            )
         ) { backStackEntry ->
-            val viewModel: OrderDetailViewModel = hiltViewModel() // Usa el VM de Detalle de Pedido
-            val uiState = viewModel.uiState
+            // Hilt se encarga de obtener los argumentos y pasarlos al ViewModel.
+            // No necesitamos hacer nada con backStackEntry aquí.
+            val viewModel: OrderDetailViewModel = hiltViewModel()
 
+            // ¡Llamamos a la pantalla con los parámetros CORRECTOS!
+            // Ya no existe 'uiState' ni 'viewModel' como parámetros separados.
+            // La pantalla DetallesPagoScreen obtiene el viewModel con hiltViewModel() directamente.
             DetallesPagoScreen(
                 navController = navController,
-                uiState = uiState, // 👈 Pasa el estado
-                // --- 👇 Pasa el ViewModel entero (como lo definimos) 👇 ---
                 viewModel = viewModel
-                // ---------------------------------------------------
-                // Las funciones 'onConfirmar...' etc. se llamarán a través del viewModel
             )
         }
+        // --- -------------------------------------------------------- ---
     }
 }

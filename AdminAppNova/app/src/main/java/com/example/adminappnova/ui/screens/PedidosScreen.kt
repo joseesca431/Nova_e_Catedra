@@ -1,5 +1,6 @@
 package com.example.adminappnova.ui.screens
 
+import android.util.Log
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
@@ -7,15 +8,13 @@ import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.foundation.shape.RoundedCornerShape
-// --- 👇 IMPORTACIONES DE ICONOS CORREGIDAS 👇 ---
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.ArrowDropDown
-import androidx.compose.material.icons.filled.ArrowDropUp // Esta línea ahora funcionará
-import androidx.compose.material.icons.filled.Check
-// --- --------------------------------------- ---
+import androidx.compose.material.icons.filled.ArrowDropUp
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
-import androidx.compose.runtime.derivedStateOf
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
@@ -31,8 +30,9 @@ import com.example.adminappnova.data.dto.PedidoResponse
 import com.example.adminappnova.ui.viewmodel.PedidosUiState
 import com.google.accompanist.swiperefresh.SwipeRefresh
 import com.google.accompanist.swiperefresh.rememberSwipeRefreshState
-import kotlinx.coroutines.flow.collect // Importa collect
-// Ya no necesitamos snapshotFlow
+
+// ¡¡¡EL CÓDIGO DEL OrderDetailViewModel HA SIDO ANIQUILADO DE AQUÍ!!!
+// ESTE ARCHIVO AHORA ESTÁ LIMPIO.
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -45,20 +45,12 @@ fun PedidosScreen(
 ) {
     var selectedTab by remember { mutableStateOf("Pedidos") }
     val listState = rememberLazyListState()
-    // Define las opciones de filtro, incluyendo "Todos" (null) y todos los valores del Enum
-    val filterOptions = listOf<EstadoPedido?>(null) + EstadoPedido.values()
-
-    // --- State para el Dropdown ---
+    val filterOptions = listOf<EstadoPedido?>(null) + EstadoPedido.values().filter { it != EstadoPedido.CARRITO }
     var isDropdownExpanded by remember { mutableStateOf(false) }
-    // ----------------------------
 
     Scaffold(
         bottomBar = {
-            NavigationBar(
-                containerColor = Color.White,
-                tonalElevation = 8.dp
-            ) { // Abre llaves NavigationBar
-                // Item Home
+            NavigationBar(containerColor = Color.White, tonalElevation = 8.dp) {
                 NavigationBarItem(
                     selected = selectedTab == "Home",
                     onClick = {
@@ -69,7 +61,6 @@ fun PedidosScreen(
                     label = { Text("Home", fontSize = 10.sp) },
                     colors = NavigationBarItemDefaults.colors(selectedIconColor = Color(0xFF2D1B4E), selectedTextColor = Color(0xFF2D1B4E), indicatorColor = Color.Transparent, unselectedIconColor = Color.Gray, unselectedTextColor = Color.Gray)
                 )
-                // Item Categorías
                 NavigationBarItem(
                     selected = selectedTab == "Categorías",
                     onClick = {
@@ -80,7 +71,6 @@ fun PedidosScreen(
                     label = { Text("Categorías", fontSize = 10.sp) },
                     colors = NavigationBarItemDefaults.colors(selectedIconColor = Color(0xFF2D1B4E), selectedTextColor = Color(0xFF2D1B4E), indicatorColor = Color.Transparent, unselectedIconColor = Color.Gray, unselectedTextColor = Color.Gray)
                 )
-                // Item Pedidos
                 NavigationBarItem(
                     selected = selectedTab == "Pedidos",
                     onClick = { selectedTab = "Pedidos" },
@@ -88,17 +78,16 @@ fun PedidosScreen(
                     label = { Text("Pedidos", fontSize = 10.sp) },
                     colors = NavigationBarItemDefaults.colors(selectedIconColor = Color(0xFF2D1B4E), selectedTextColor = Color(0xFF2D1B4E), indicatorColor = Color.Transparent, unselectedIconColor = Color.Gray, unselectedTextColor = Color.Gray)
                 )
-            } // Cierra llaves NavigationBar
-        } // Cierra bottomBar
-    ) { paddingValues -> // Abre contenido Scaffold
+            }
+        }
+    ) { paddingValues ->
         Column(
             modifier = Modifier
                 .fillMaxSize()
                 .background(Color(0xFFF5F5F5))
-                .padding(paddingValues), // Padding solo del Scaffold aquí
+                .padding(paddingValues),
             horizontalAlignment = Alignment.CenterHorizontally
         ) {
-            // Título
             Text(
                 text = "Administración de Pedidos",
                 fontSize = 20.sp,
@@ -107,32 +96,19 @@ fun PedidosScreen(
                 modifier = Modifier.padding(top = 16.dp)
             )
 
-            // --- MENÚ DESPLEGABLE PARA FILTROS ---
             Spacer(modifier = Modifier.height(16.dp))
-            Box(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .padding(horizontal = 16.dp)
-            ) {
+            Box(modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp)) {
                 ExposedDropdownMenuBox(
                     expanded = isDropdownExpanded,
                     onExpandedChange = { isDropdownExpanded = it },
                     modifier = Modifier.fillMaxWidth()
                 ) {
-                    // --- TextField (CORREGIDO CON ICONOS) ---
                     OutlinedTextField(
                         value = estadoToString(uiState.filtroEstado),
                         onValueChange = {},
                         readOnly = true,
                         label = { Text("Filtrar por estado") },
-                        trailingIcon = {
-                            // --- 👇 USA LOS ICONOS IMPORTADOS 👇 ---
-                            Icon(
-                                imageVector = if (isDropdownExpanded) Icons.Filled.ArrowDropUp else Icons.Filled.ArrowDropDown,
-                                contentDescription = if (isDropdownExpanded) "Cerrar menú" else "Abrir menú"
-                            )
-                            // --- -------------------------------- ---
-                        },
+                        trailingIcon = { Icon(if (isDropdownExpanded) Icons.Filled.ArrowDropUp else Icons.Filled.ArrowDropDown, "Abrir/Cerrar menú") },
                         colors = OutlinedTextFieldDefaults.colors(
                             focusedContainerColor = Color.White,
                             unfocusedContainerColor = Color.White,
@@ -140,12 +116,8 @@ fun PedidosScreen(
                             focusedBorderColor = Color(0xFF2D1B4E),
                             unfocusedBorderColor = Color.Gray
                         ),
-                        modifier = Modifier
-                            .menuAnchor()
-                            .fillMaxWidth()
-                    ) // Fin OutlinedTextField
-
-                    // --- Menú (sin cambios) ---
+                        modifier = Modifier.menuAnchor().fillMaxWidth()
+                    )
                     ExposedDropdownMenu(
                         expanded = isDropdownExpanded,
                         onDismissRequest = { isDropdownExpanded = false },
@@ -161,13 +133,11 @@ fun PedidosScreen(
                                 colors = if (uiState.filtroEstado == estado) MenuDefaults.itemColors(textColor = Color(0xFF2D1B4E)) else MenuDefaults.itemColors()
                             )
                         }
-                    } // Fin ExposedDropdownMenu
-                } // Fin ExposedDropdownMenuBox
-            } // Fin Box dropdown
+                    }
+                }
+            }
             Spacer(modifier = Modifier.height(16.dp))
-            // --- ----------------------------------- ---
 
-            // SwipeRefresh y Lista (sin cambios)
             val swipeRefreshState = rememberSwipeRefreshState(isRefreshing = uiState.isLoading && uiState.pedidosFiltrados.isNotEmpty())
             SwipeRefresh(
                 state = swipeRefreshState,
@@ -180,34 +150,36 @@ fun PedidosScreen(
                     } else if (uiState.pedidosFiltrados.isEmpty() && uiState.error == null && !uiState.isLoading) {
                         Text(
                             text = if (uiState.filtroEstado == null) "No hay pedidos." else "No hay pedidos con estado '${estadoToString(uiState.filtroEstado)}'.",
-                            modifier = Modifier.align(Alignment.Center).padding(horizontal=16.dp),
+                            modifier = Modifier.align(Alignment.Center).padding(horizontal = 16.dp),
                             textAlign = TextAlign.Center, color = Color.Gray
                         )
                     } else {
-                        // Lista de Pedidos
                         LazyColumn(
                             state = listState,
                             modifier = Modifier.fillMaxSize(),
-                            contentPadding = PaddingValues(bottom = if (uiState.isLoadingMore || uiState.canLoadMore) 40.dp else 16.dp),
+                            contentPadding = PaddingValues(bottom = if (uiState.isLoadingMore || !uiState.canLoadMore) 40.dp else 16.dp),
                             verticalArrangement = Arrangement.spacedBy(12.dp)
                         ) {
                             items(uiState.pedidosFiltrados, key = { it.idPedido }) { pedido ->
                                 PedidoCard(
                                     pedido = pedido,
-                                    onClick = { navController.navigate("detalles_pago/${pedido.idPedido}") }
+                                    onClick = {
+                                        if (pedido.idUser != null) {
+                                            navController.navigate("detalles_pago/${pedido.idPedido}/${pedido.idUser}")
+                                        } else {
+                                            Log.e("PedidosScreen", "CRÍTICO: idUser es nulo para el pedido ${pedido.idPedido}. No se puede navegar.")
+                                        }
+                                    }
                                 )
                             }
-                            // Indicador Carga Más / Fin Lista
                             item {
                                 if (uiState.isLoadingMore) {
-                                    Row(Modifier.fillMaxWidth().padding(vertical=8.dp), Arrangement.Center) { CircularProgressIndicator(Modifier.size(24.dp)) }
+                                    Row(Modifier.fillMaxWidth().padding(vertical = 8.dp), Arrangement.Center) { CircularProgressIndicator(Modifier.size(24.dp)) }
                                 } else if (!uiState.canLoadMore && uiState.pedidosFiltrados.isNotEmpty()) {
-                                    Text("Fin de la lista", Modifier.fillMaxWidth().padding(vertical=8.dp), textAlign=TextAlign.Center, color=Color.Gray, fontSize=12.sp)
+                                    Text("Fin de la lista", Modifier.fillMaxWidth().padding(vertical = 8.dp), textAlign = TextAlign.Center, color = Color.Gray, fontSize = 12.sp)
                                 }
                             }
-                        } // Fin LazyColumn
-
-                        // Lógica Carga Más con derivedStateOf
+                        }
                         val endOfListReached by remember {
                             derivedStateOf {
                                 val lastVisibleItem = listState.layoutInfo.visibleItemsInfo.lastOrNull()
@@ -218,20 +190,18 @@ fun PedidosScreen(
                             if (endOfListReached && uiState.canLoadMore && !uiState.isLoadingMore && !uiState.isLoading) {
                                 onLoadNextPage()
                             }
-                        } // Fin LaunchedEffect
-                    } // Fin else (muestra lista)
-
-                    // Snackbar de Error
-                    uiState.error?.let { error ->
-                        Snackbar( Modifier.align(Alignment.BottomCenter).padding(16.dp), action = { Button(onClick = onRefresh) { Text("Reintentar") } } ) { Text(text = error) }
+                        }
                     }
-                } // Fin Box Contenido Principal
-            } // Fin SwipeRefresh
-        } // Fin Column principal
-    } // Fin Scaffold
+
+                    uiState.error?.let { error ->
+                        Snackbar(Modifier.align(Alignment.BottomCenter).padding(16.dp), action = { Button(onClick = onRefresh) { Text("Reintentar") } }) { Text(text = error) }
+                    }
+                }
+            }
+        }
+    }
 }
 
-// --- PedidoCard (sin cambios) ---
 @Composable
 fun PedidoCard(pedido: PedidoResponse, onClick: () -> Unit) {
     Card(
@@ -243,9 +213,9 @@ fun PedidoCard(pedido: PedidoResponse, onClick: () -> Unit) {
         Column(Modifier.fillMaxSize().padding(16.dp), Arrangement.SpaceBetween) {
             Row(Modifier.fillMaxWidth(), Arrangement.SpaceBetween, Alignment.Top) {
                 Text("Pedido #${pedido.idPedido}", fontSize = 14.sp, color = Color.White, fontWeight = FontWeight.Bold)
-                Text(pedido.fechaInicio?.substringBefore('T') ?: "-", fontSize = 10.sp, color = Color.LightGray)
+                Text(pedido.fechaInicio.substringBefore('T'), fontSize = 10.sp, color = Color.LightGray)
             }
-            Text("Cliente ID: ${pedido.idCarrito ?: "N/A"}", fontSize = 12.sp, color = Color.White, fontWeight = FontWeight.Normal)
+            Text("Cliente ID: ${pedido.idUser ?: "N/A"}", fontSize = 12.sp, color = Color.White, fontWeight = FontWeight.Normal)
             Row(Modifier.fillMaxWidth(), Arrangement.SpaceBetween, Alignment.Bottom) {
                 Text(pedido.estado?.name ?: "N/A", fontSize = 12.sp, color = estadoColor(pedido.estado), fontWeight = FontWeight.Medium)
                 Text("$${pedido.total?.let { "%.2f".format(it) } ?: "0.00"}", fontSize = 20.sp, color = Color.White, fontWeight = FontWeight.Bold)
@@ -254,25 +224,20 @@ fun PedidoCard(pedido: PedidoResponse, onClick: () -> Unit) {
     }
 }
 
-// --- estadoColor (sin cambios, pública) ---
 @Composable
 fun estadoColor(estado: EstadoPedido?): Color {
     return when (estado) {
-        EstadoPedido.CARRITO -> Color(0xFF78909C)   // Azul Gris
-        EstadoPedido.PENDIENTE -> Color(0xFFFFA726) // Naranja
-        EstadoPedido.PAGADO -> Color(0xFF66BB6A)     // Verde
-        EstadoPedido.EN_PROCESO -> Color(0xFFAB47BC) // Morado
-        EstadoPedido.ENVIADO -> Color(0xFF29B6F6)   // Celeste
-        EstadoPedido.ENTREGADO -> Color(0xFFBDBDBD)  // Gris
-        EstadoPedido.CANCELADO -> Color(0xFFEF5350)  // Rojo
+        EstadoPedido.CARRITO -> Color(0xFF78909C)
+        EstadoPedido.PENDIENTE -> Color(0xFFFFA726)
+        EstadoPedido.PAGADO -> Color(0xFF66BB6A)
+        EstadoPedido.EN_PROCESO -> Color(0xFFAB47BC)
+        EstadoPedido.ENVIADO -> Color(0xFF29B6F6)
+        EstadoPedido.ENTREGADO -> Color(0xFFBDBDBD)
+        EstadoPedido.CANCELADO -> Color(0xFFEF5350)
         else -> Color.Gray
     }
 }
 
-// --- estadoToString (sin cambios) ---
 private fun estadoToString(estado: EstadoPedido?): String {
-    // Si estado es null, devuelve "Todos"
-    // Si no, toma el nombre (ej: "EN_PROCESO"), reemplaza "_" con " ",
-    // lo pone en minúsculas ("en proceso"), y pone la primera letra en mayúscula ("En proceso")
     return estado?.name?.replace("_", " ")?.lowercase()?.replaceFirstChar { if (it.isLowerCase()) it.titlecase() else it.toString() } ?: "Todos"
 }

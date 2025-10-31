@@ -1,38 +1,22 @@
 package com.example.adminappnova.data.dto
 
 import java.math.BigDecimal
-// Si usas java.time (API 26+):
-import java.time.LocalDateTime
-// Si usas ThreeTenABP (API < 26), importa esto en su lugar:
-// import org.threeten.bp.LocalDateTime
 
-// --- 👇 ENUM CORREGIDO (COINCIDE CON TU JAVA) 👇 ---
 enum class EstadoPedido {
-    CARRITO,        // Pedido en carrito
-    PENDIENTE,      // Confirmado, esperando pago
-    PAGADO,         // Pago exitoso
-    EN_PROCESO,     // Preparando envío
-    ENVIADO,        // En camino
-    ENTREGADO,      // Recibido por el cliente
-    CANCELADO       // Pedido cancelado
+    CARRITO, PENDIENTE, PAGADO, EN_PROCESO, ENVIADO, ENTREGADO, CANCELADO
 }
-// ---------------------------------------------
 
-// --- ENUM TIPO PAGO (ACTUALIZADO SEGÚN TUS LOGS/DTOS) ---
 enum class TipoPago {
-    EFECTIVO,
-    PAYPAL,
-    TARJETA_CREDITO,
-    TARJETA // Añade otros si existen
+    EFECTIVO, PAYPAL, TARJETA_CREDITO, TARJETA
 }
-// ---------------------------------------------------
 
-// --- DTOs (SIN CAMBIOS, SOLO PARA CONTEXTO) ---
-
-// Coincide con PedidoResponse.java
+/**
+ * DTO limpio que representa la respuesta de un pedido individual
+ * de la API (ej. /auth/pedido/{id}).
+ */
 data class PedidoResponse(
     val idPedido: Long,
-    val fechaInicio: String, // O LocalDateTime/Instant si usas un TypeAdapter
+    val fechaInicio: String,
     val fechaFinal: String?,
     val total: BigDecimal?,
     val puntosTotales: Int?,
@@ -43,11 +27,17 @@ data class PedidoResponse(
     val aliasDireccion: String?,
     val calleDireccion: String?,
     val ciudadDireccion: String?,
-    val departamentoDireccion: String?
-    // Los campos _links de HATEOAS se ignoran por defecto
+    val departamentoDireccion: String?,
+    // ¡LA CLAVE! 'var' para poder ser modificado después de la creación inicial por el deserializador.
+    var idUser: Long? = null // <--- ¡¡AÑADE ESTA LÍNEA DE NUEVO!!
 )
 
-// Coincide con PedidoRequest.java
+
+// --- DTOs de Petición (Request) ---
+
+/**
+ * DTO para la petición de checkout (crear un pedido desde un carrito).
+ */
 data class PedidoRequest(
     val idCarrito: Long,
     val tipoPago: TipoPago,
@@ -55,8 +45,23 @@ data class PedidoRequest(
     val idDireccion: Long?
 )
 
-// Coincide con PagoRequest.java (Asumiendo campos)
+/**
+ * DTO para la petición de pago.
+ */
 data class PagoRequest(
     val metodo: String,
     val referencia: String
+)
+
+/**
+ * DTO para representar un item de producto dentro de un pedido.
+ * * !! COMENTARIO CORREGIDO !!
+ * La API SÍ provee un endpoint para esto, y se está usando en el ViewModel.
+ * (ver: PedidoApiService.kt -> getPedidoItems)
+ */
+data class PedidoItemDto(
+    val idProducto: Long,
+    val nombreProducto: String,
+    val cantidad: Int,
+    val precioUnitario: BigDecimal
 )
