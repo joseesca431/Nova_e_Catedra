@@ -260,7 +260,7 @@ fun RegisterScreen(
 
         // Opcionales validados
         FormTextField(
-            label = "Teléfono (Opcional) - formato 1234-5678",
+            label = "Teléfono - formato 1234-5678",
             value = uiState.telefono,
             onValueChange = onTelefonoChange,
             keyboardType = KeyboardType.Phone,
@@ -269,7 +269,7 @@ fun RegisterScreen(
         )
 
         FormTextField(
-            label = "DUI (Opcional) - formato 12345678-9",
+            label = "DUI - formato 12345678-9",
             value = uiState.dui,
             onValueChange = onDuiChange,
             keyboardType = KeyboardType.Number,
@@ -278,7 +278,7 @@ fun RegisterScreen(
         )
 
         FormTextField(
-            label = "Dirección (Opcional)",
+            label = "Dirección ",
             value = uiState.direccion,
             onValueChange = onDireccionChange,
             singleLine = false,

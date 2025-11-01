@@ -3,15 +3,69 @@ package com.example.aplicacionjetpack.ui.navigation
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.remember
 import androidx.hilt.navigation.compose.hiltViewModel
-import androidx.navigation.NavBackStackEntry
-import androidx.navigation.NavController
-import androidx.navigation.NavType
+import androidx.navigation.*
 import androidx.navigation.compose.NavHost
 import androidx.navigation.compose.composable
+import androidx.navigation.compose.navigation
 import androidx.navigation.compose.rememberNavController
-import androidx.navigation.navArgument
 import com.example.aplicacionjetpack.ui.screens.*
 import com.example.aplicacionjetpack.ui.viewmodel.*
+
+// --- 👇👇👇 ¡GRAFO DE CHECKOUT RECONSTRUIDO! 👇👇👇 ---
+fun NavGraphBuilder.checkoutGraph(navController: NavController) {
+    // La ruta del grafo ahora INCLUYE el parámetro. Esto es clave.
+    navigation(
+        startDestination = "confirm_address/{idCarrito}",
+        route = "checkout_flow/{idCarrito}",
+        arguments = listOf(navArgument("idCarrito") { type = NavType.LongType })
+    ) {
+        composable(
+            route = "confirm_address/{idCarrito}",
+            arguments = listOf(navArgument("idCarrito") { type = NavType.LongType })
+        ) { backStackEntry ->
+            // Obtenemos el ViewModel con el ámbito del grafo "checkout_flow/{idCarrito}"
+            val checkoutViewModel: CheckoutViewModel = hiltViewModel(
+                remember(backStackEntry) { navController.getBackStackEntry("checkout_flow/{idCarrito}") }
+            )
+            ConfirmAddressScreen(
+                navController = navController,
+                idCarrito = backStackEntry.arguments?.getLong("idCarrito") ?: 0L,
+                viewModel = checkoutViewModel
+            )
+        }
+
+        composable(
+            route = "detalles_pago/{idCarrito}",
+            arguments = listOf(navArgument("idCarrito") { type = NavType.LongType })
+        ) { backStackEntry ->
+            // Obtenemos la MISMA instancia del ViewModel
+            val checkoutViewModel: CheckoutViewModel = hiltViewModel(
+                remember(backStackEntry) { navController.getBackStackEntry("checkout_flow/{idCarrito}") }
+            )
+            DetallesPagoScreen(
+                navController = navController,
+                idCarrito = backStackEntry.arguments?.getLong("idCarrito") ?: 0L,
+                checkoutViewModel = checkoutViewModel
+            )
+        }
+
+        composable(
+            route = "pago/{idCarrito}",
+            arguments = listOf(navArgument("idCarrito") { type = NavType.LongType })
+        ) { backStackEntry ->
+            // Obtenemos la MISMA instancia del ViewModel
+            val checkoutViewModel: CheckoutViewModel = hiltViewModel(
+                remember(backStackEntry) { navController.getBackStackEntry("checkout_flow/{idCarrito}") }
+            )
+            PagoScreen(
+                navController = navController,
+                idCarrito = backStackEntry.arguments?.getLong("idCarrito") ?: 0L,
+                viewModel = checkoutViewModel
+            )
+        }
+    }
+}
+
 
 @Composable
 fun AppNavigation() {
@@ -21,7 +75,7 @@ fun AppNavigation() {
         navController = navController,
         startDestination = "splash"
     ) {
-        // ... (splash, login, register no cambian) ...
+        // ... (splash, login, register, etc. no cambian) ...
         composable("splash") {
             SplashScreen(navController = navController)
         }
@@ -38,28 +92,26 @@ fun AppNavigation() {
         }
 
         composable("register") {
-            // obtiene la instancia correcta del ViewModel con Hilt
-            val registerViewModel: RegisterViewModel = hiltViewModel()
-
+            val viewModel: RegisterViewModel = hiltViewModel()
             RegisterScreen(
                 navController = navController,
-                uiState = registerViewModel.uiState,
-                onPrimerNombreChange = registerViewModel::onPrimerNombreChange,
-                onSegundoNombreChange = registerViewModel::onSegundoNombreChange,
-                onPrimerApellidoChange = registerViewModel::onPrimerApellidoChange,
-                onSegundoApellidoChange = registerViewModel::onSegundoApellidoChange,
-                onEmailChange = registerViewModel::onEmailChange,
-                onUsernameChange = registerViewModel::onUsernameChange,
-                onPasswordChange = registerViewModel::onPasswordChange,
-                onConfirmPasswordChange = registerViewModel::onConfirmPasswordChange,
-                onTelefonoChange = registerViewModel::onTelefonoChange,
-                onDuiChange = registerViewModel::onDuiChange,
-                onDireccionChange = registerViewModel::onDireccionChange,
-                onRegisterClick = registerViewModel::onRegisterClicked,
-                onFechaNacimientoClicked = registerViewModel::onFechaNacimientoClicked,
-                onCalendarDismiss = registerViewModel::onCalendarDismiss,
-                onDateSelected = registerViewModel::onDateSelected,
-                onDismissErrorDialog = registerViewModel::dismissErrorDialog
+                uiState = viewModel.uiState,
+                onPrimerNombreChange = viewModel::onPrimerNombreChange,
+                onSegundoNombreChange = viewModel::onSegundoNombreChange,
+                onPrimerApellidoChange = viewModel::onPrimerApellidoChange,
+                onSegundoApellidoChange = viewModel::onSegundoApellidoChange,
+                onEmailChange = viewModel::onEmailChange,
+                onUsernameChange = viewModel::onUsernameChange,
+                onPasswordChange = viewModel::onPasswordChange,
+                onConfirmPasswordChange = viewModel::onConfirmPasswordChange,
+                onTelefonoChange = viewModel::onTelefonoChange,
+                onDuiChange = viewModel::onDuiChange,
+                onDireccionChange = viewModel::onDireccionChange,
+                onRegisterClick = viewModel::onRegisterClicked,
+                onFechaNacimientoClicked = viewModel::onFechaNacimientoClicked,
+                onCalendarDismiss = viewModel::onCalendarDismiss,
+                onDateSelected = viewModel::onDateSelected,
+                onDismissErrorDialog = viewModel::dismissErrorDialog
             )
         }
 
@@ -82,8 +134,7 @@ fun AppNavigation() {
             val viewModel: SearchViewModel = hiltViewModel()
             BusquedaScreen(
                 navController = navController,
-                uiState = viewModel.uiState,
-                onQueryChange = viewModel::onSearchQueryChanged,
+                viewModel = viewModel,
                 onProductClick = { product ->
                     navController.navigate("product_detail/${product.idProducto}")
                 }
@@ -97,66 +148,28 @@ fun AppNavigation() {
             val productId = backStackEntry.arguments?.getLong("productId") ?: 0L
             ProductDetailScreen(
                 navController = navController,
-                productId = productId
+                productId = productId,
+                viewModel = hiltViewModel(),
+                carritoViewModel = hiltViewModel()
             )
         }
 
         composable("cart") {
             CarritoScreen(
                 navController = navController,
+                // --- 👇👇👇 ¡LA LLAMADA AHORA CONSTRUYE LA RUTA COMPLETA! 👇👇👇 ---
                 onPagarClick = { idCarrito ->
                     if (idCarrito > 0) {
-                        navController.navigate("confirm_address/$idCarrito")
+                        // Construimos la ruta que el grafo "checkout_flow/{idCarrito}" espera.
+                        navController.navigate("checkout_flow/$idCarrito")
                     }
                 }
+                // --- --------------------------------------------------------- ---
             )
         }
 
-        composable(
-            route = "confirm_address/{idCarrito}",
-            arguments = listOf(navArgument("idCarrito") { type = NavType.LongType })
-        ) { backStackEntry ->
-            val idCarrito = backStackEntry.arguments?.getLong("idCarrito") ?: 0L
-            ConfirmAddressScreen(
-                navController = navController,
-                idCarrito = idCarrito,
-                viewModel = hiltViewModel()
-            )
-        }
-
-        composable(
-            route = "detalles_pago/{idCarrito}",
-            arguments = listOf(navArgument("idCarrito") { type = NavType.LongType })
-        ) { backStackEntry ->
-            val idCarrito = backStackEntry.arguments?.getLong("idCarrito") ?: 0L
-            val checkoutViewModel: CheckoutViewModel = hiltViewModel(
-                remember(backStackEntry) {
-                    navController.getBackStackEntry("confirm_address/{idCarrito}")
-                }
-            )
-            DetallesPagoScreen(
-                navController = navController,
-                idCarrito = idCarrito,
-                checkoutViewModel = checkoutViewModel
-            )
-        }
-
-        composable(
-            route = "pago/{idCarrito}",
-            arguments = listOf(navArgument("idCarrito") { type = NavType.LongType })
-        ) { backStackEntry ->
-            val idCarrito = backStackEntry.arguments?.getLong("idCarrito") ?: 0L
-            val checkoutViewModel: CheckoutViewModel = hiltViewModel(
-                remember(backStackEntry) {
-                    navController.getBackStackEntry("confirm_address/{idCarrito}")
-                }
-            )
-            PagoScreen(
-                navController = navController,
-                idCarrito = idCarrito,
-                viewModel = checkoutViewModel
-            )
-        }
+        // --- El grafo se llama igual, pero ahora está definido para recibir un ID ---
+        checkoutGraph(navController)
 
         composable("pago_finalizado") {
             PagoFinalizadoScreen(navController = navController)
@@ -166,11 +179,9 @@ fun AppNavigation() {
             ProfileScreen(navController = navController)
         }
 
-        // --- 👇👇👇 ¡¡¡AÑADIMOS LA NUEVA RUTA!!! 👇👇👇 ---
         composable("editar_profile") {
             EditarProfileScreen(navController = navController)
         }
-        // --- --------------------------------------- ---
 
         composable("historial_compras") {
             HistorialComprasScreen(navController = navController)
