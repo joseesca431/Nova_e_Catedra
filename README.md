@@ -13,7 +13,6 @@ Universidad Don Bosco – Facultad de Ingeniería
 
 Ambas aplicaciones se comunican con un *Backend REST monolítico* que actúa como fuente única de verdad, garantizando consistencia en los datos, seguridad mediante JWT y una arquitectura limpia basada en MVVM, Jetpack Compose, Retrofit, Hilt y Kotlin Coroutines.
 
----
 🔗 [*Link de API*](https://github.com/EduardoRamirez86/ProyectoCatedraDWF)
 ---
 
@@ -92,4 +91,5 @@ Los diseños de la interfaz de usuario fueron creados en Figma:
    ```bash
    
    git clone https://github.com/EduardoRamirez86/ProyectoCatedraDWF.git
+
 
